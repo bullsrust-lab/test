@@ -1,0 +1,87 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.initial {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.position {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.company {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meta time {
+  font-size: 12.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.actions [aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.delete {
+  background: transparent;
+  color: var(--danger);
+}
+
+.delete:hover:not(:disabled) {
+  background: var(--danger-soft);
+}

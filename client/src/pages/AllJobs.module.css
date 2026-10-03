@@ -1,0 +1,75 @@
+.count {
+  margin: 22px 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.error {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.skeleton {
+  height: 172px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 40px 28px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.empty h2 {
+  font-size: 18px;
+}
+
+.empty p {
+  margin-bottom: 8px;
+  color: var(--text-muted);
+}
+
+.modalText {
+  color: var(--text-muted);
+}
+
+.modalText b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}

@@ -1,0 +1,33 @@
+.dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog::backdrop {
+  background: rgb(20 18 14 / 45%);
+}
+
+.dialog[open] {
+  animation: pop 0.16s ease-out;
+}
+
+.body {
+  padding: 22px;
+}
+
+.title {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
