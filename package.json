@@ -1,0 +1,25 @@
+{
+  "name": "jobtrail",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Job application tracker built with the MERN stack",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c green,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm start -w server",
+    "seed": "npm run seed -w server",
+    "test": "npm test -w server",
+    "lint": "oxlint -c .oxlintrc.json client/src server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4",
+    "oxlint": "^1.86.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
