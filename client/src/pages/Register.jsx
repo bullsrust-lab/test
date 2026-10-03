@@ -18,7 +18,7 @@ const validate = ({ name, email, password }, isMember) => {
   if (!email.trim()) errors.email = 'Email is required'
   else if (!/^\S+@\S+\.\S+$/.test(email.trim())) errors.email = 'Please provide a valid email'
   if (!password) errors.password = 'Password is required'
-  else if (!isMember && password.length < 6) errors.password = 'Password must be at least 6 characters'
+  else if (!isMember && password.length < 8) errors.password = 'Password must be at least 8 characters'
   return errors
 }
 
@@ -142,8 +142,8 @@ function Register() {
               onChange={handleChange}
               error={fieldErrors.password}
               autoComplete={isMember ? 'current-password' : 'new-password'}
-              minLength={isMember ? undefined : 6}
-              hint={isMember ? undefined : 'At least 6 characters'}
+              minLength={isMember ? undefined : 8}
+              hint={isMember ? undefined : 'At least 8 characters'}
               required
             >
               <button

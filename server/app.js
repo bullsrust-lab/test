@@ -13,6 +13,7 @@ import auth from './middleware/auth.js'
 import demoUser from './middleware/demoUser.js'
 import notFound from './middleware/notFound.js'
 import errorHandler from './middleware/errorHandler.js'
+import { apiLimiter } from './middleware/rateLimit.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const clientDist = path.resolve(__dirname, '../client/dist')
@@ -29,7 +30,7 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        'style-src': ["'self'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
       },
     },
@@ -38,7 +39,16 @@ app.use(
 app.use(express.json({ limit: '10kb' }))
 app.use(mongoSanitize())
 
+// health check goes before the limiter, Render calls it all the time
 app.get('/api/v1/health', (req, res) => res.json({ status: 'ok' }))
+
+// API answers contain personal data, keep them out of the browser cache
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store')
+  next()
+})
+app.use('/api/v1', apiLimiter)
+
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/users', auth, demoUser, userRoutes)
 app.use('/api/v1/jobs', auth, demoUser, jobsRoutes)

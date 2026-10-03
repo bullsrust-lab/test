@@ -36,7 +36,8 @@ Things I added on top:
 
 - **Follow-up reminders.** A job that has been quiet for 10+ days (no status change, no follow-up) shows up in a "Gone quiet" panel above the list, with a short check-in email ready to copy. "Followed up" resets the timer. Pending jobs with no answer for 30+ days get an aged card and a "no reply" stamp. The server records when a job first left `pending` (a pre-save hook), which also gives the median time to a reply on the Stats page.
 - Input validation on the server (express-validator) and in the forms, errors shown next to the field
-- helmet, rate limiting on `/auth`, `express-mongo-sanitize`, 10kb body limit
+- helmet with a strict CSP, `express-mongo-sanitize`, 10kb body limit, `Cache-Control: no-store` on API responses
+- Rate limits: 20 failed logins per 15 min, 60 auth requests per 15 min, 10 sign-ups per hour, 600 API requests per 15 min (all per IP), 10 profile changes per hour. Passwords need 8+ characters and can't be one of the most common ones. Up to 1000 jobs per account
 - Read-only demo account + seed script
 - Stats page with counts per status and applications per month
 - Filters and page live in the URL, so refresh and the back button keep them
@@ -82,7 +83,7 @@ The `.env` file goes in the project root.
 | `PORT`          | API port                                                | `5000`                     |
 | `NODE_ENV`      | `development` or `production`                           | `development`              |
 | `MONGO_URI`     | MongoDB connection string                               | `mongodb+srv://...`        |
-| `JWT_SECRET`    | Secret used to sign tokens, make it long and random     |                            |
+| `JWT_SECRET`    | Secret used to sign tokens, at least 32 random characters (the server won't start with a shorter one) | |
 | `JWT_LIFETIME`  | Token lifetime                                          | `1d`                       |
 | `DEMO_EMAIL`    | Email of the demo user created by `npm run seed`        | `demo@jobtrail.dev`        |
 | `DEMO_PASSWORD` | Password for the demo user (nobody needs to know it)    |                            |
@@ -155,7 +156,7 @@ All routes are under `/api/v1`. Errors always come back as `{ "msg": "..." }`; v
 { "jobs": [], "totalJobs": 42, "numOfPages": 5 }
 ```
 
-Status codes: 200, 201, 400 (validation, bad id), 401 (no/invalid token, wrong credentials), 403 (someone else's job, demo user writes), 404, 413 (body over 10 kB), 429 (too many failed auth attempts).
+Status codes: 200, 201, 400 (validation, bad id), 401 (no/invalid token, wrong credentials), 403 (someone else's job, demo user writes), 404, 413 (body over 10 kB), 429 (rate limits).
 
 ## Deploying to Render
 
@@ -178,4 +179,5 @@ The demo account needs data: run `npm run seed` once locally with `MONGO_URI` in
 - No end-to-end tests yet. The API is covered, the UI I tested by hand. Next step would be a few Playwright tests for login → add → edit → delete.
 - Search uses a case-insensitive regex on `position`. Fine for a personal list, but with a lot of data a text index would be better.
 - The demo account is shared, so it's read-only on the server, not just hidden buttons in the UI.
+- Someone else's job answers 403, as the task asks. Strictly speaking that confirms the id exists; a 404 would hide it, which is what I'd do outside a test task.
 - The follow-up thresholds (10 and 30 days) are constants on both sides. With more time they'd be a user setting, and the reminder could be an email instead of a panel you have to open.

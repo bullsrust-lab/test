@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import mongoose from 'mongoose'
 import { UnauthenticatedError } from '../errors/index.js'
 
 const auth = (req, res, next) => {
@@ -7,12 +8,20 @@ const auth = (req, res, next) => {
     throw new UnauthenticatedError()
   }
 
+  let payload
   try {
-    const { userId, name, role } = jwt.verify(header.split(' ')[1], process.env.JWT_SECRET)
-    req.user = { userId, name, role }
+    payload = jwt.verify(header.split(' ')[1], process.env.JWT_SECRET, { algorithms: ['HS256'] })
   } catch {
     throw new UnauthenticatedError()
   }
+
+  // userId ends up in database filters, so make sure it really is an id
+  const { userId, name, role } = payload
+  if (typeof userId !== 'string' || !mongoose.isValidObjectId(userId)) {
+    throw new UnauthenticatedError()
+  }
+
+  req.user = { userId, name, role }
   next()
 }
 

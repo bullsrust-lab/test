@@ -39,7 +39,13 @@ export const getAllJobs = async (req, res) => {
   })
 }
 
+// a personal tracker never needs more, and it stops one script from filling the free database tier
+const MAX_JOBS = 1000
+
 export const createJob = async (req, res) => {
+  if ((await Job.countDocuments({ createdBy: req.user.userId })) >= MAX_JOBS) {
+    throw new BadRequestError(`You can track up to ${MAX_JOBS} applications`)
+  }
   const job = await Job.create({ ...pickFields(req.body), createdBy: req.user.userId })
   res.status(StatusCodes.CREATED).json({ job })
 }

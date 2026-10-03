@@ -3,6 +3,43 @@ import mongoose from 'mongoose'
 import { BadRequestError } from '../errors/index.js'
 import { JOB_STATUS, JOB_TYPE } from '../models/Job.js'
 
+// the usual suspects from leaked-password lists, checked case-insensitively
+const COMMON_PASSWORDS = new Set([
+  '12345678',
+  '123456789',
+  '1234567890',
+  '11111111',
+  '00000000',
+  '87654321',
+  '12341234',
+  'password',
+  'password1',
+  'password123',
+  'passw0rd',
+  'qwerty123',
+  'qwertyuiop',
+  'qwerty12',
+  'iloveyou',
+  'sunshine',
+  'football',
+  'baseball',
+  'superman',
+  'princess',
+  'whatever',
+  'trustno1',
+  'letmein1',
+  'welcome1',
+  'abc12345',
+  'abcd1234',
+  'asdfghjk',
+  'zaq12wsx',
+  '1q2w3e4r',
+  '1qaz2wsx',
+  'changeme',
+  'jobtrail',
+  'jobtrail1',
+])
+
 const withErrors = (rules) => [
   ...rules,
   (req, res, next) => {
@@ -47,8 +84,11 @@ export const validateRegister = withErrors([
     .isString()
     .withMessage('Password is required')
     .bail()
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters')
+    .bail()
+    .custom((value) => !COMMON_PASSWORDS.has(value.toLowerCase()))
+    .withMessage('This password is too common, pick something else')
     // bcrypt only looks at the first 72 bytes, anything after that would be silently ignored
     .custom((value) => Buffer.byteLength(value, 'utf8') <= 72)
     .withMessage('Password is too long'),
@@ -97,6 +137,8 @@ export const validateIdParam = withErrors([
     .withMessage('Invalid job id'),
 ])
 
+const NUL = String.fromCharCode(0)
+
 export const validateJobsQuery = withErrors([
   query('status').optional().isIn(['all', ...JOB_STATUS]).withMessage('Invalid status filter'),
   query('jobType').optional().isIn(['all', ...JOB_TYPE]).withMessage('Invalid job type filter'),
@@ -104,5 +146,15 @@ export const validateJobsQuery = withErrors([
     .optional()
     .isIn(['latest', 'oldest', 'a-z', 'z-a'])
     .withMessage('Invalid sort option'),
-  query('search').optional().isString().isLength({ max: 100 }).withMessage('Search is too long'),
+  query('search')
+    .optional()
+    .isString()
+    .withMessage('Invalid search')
+    .bail()
+    .isLength({ max: 100 })
+    .withMessage('Search is too long')
+    .bail()
+    // MongoDB refuses a regex with a NUL byte in it (500 instead of a clean 400)
+    .custom((value) => !value.includes(NUL))
+    .withMessage('Invalid search'),
 ])

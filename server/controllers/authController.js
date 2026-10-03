@@ -1,7 +1,10 @@
 import { StatusCodes } from 'http-status-codes'
+import bcrypt from 'bcryptjs'
 import User from '../models/User.js'
 import { BadRequestError, NotFoundError, UnauthenticatedError } from '../errors/index.js'
 import refreshDemo from '../utils/refreshDemo.js'
+
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10)
 
 const sendUser = (res, statusCode, user) => {
   res.status(statusCode).json({ user, token: user.createJWT() })
@@ -23,7 +26,12 @@ export const login = async (req, res) => {
   const { email, password } = req.body
 
   const user = await User.findOne({ email }).select('+password')
-  if (!user || !(await user.comparePassword(password))) {
+  if (!user) {
+    // compare anyway, so "no such email" doesn't answer noticeably faster than "wrong password"
+    await bcrypt.compare(password, DUMMY_HASH)
+    throw new UnauthenticatedError('Invalid credentials')
+  }
+  if (!(await user.comparePassword(password))) {
     throw new UnauthenticatedError('Invalid credentials')
   }
 

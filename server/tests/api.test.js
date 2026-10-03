@@ -328,6 +328,42 @@ describe('validation edge cases', () => {
   })
 })
 
+describe('security hardening', () => {
+  it('rejects short and common passwords', async () => {
+    expect((await register({ password: 'short12' })).status).toBe(400)
+    const common = await register({ password: 'Password123' })
+    expect(common.status).toBe(400)
+    expect(common.body.msg).toMatch(/too common/)
+  })
+
+  it('answers 400 for a NUL byte in search instead of crashing', async () => {
+    const token = await tokenFor()
+    const res = await request(app).get('/api/v1/jobs?search=a%00b').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
+  })
+
+  it('does not let API responses be cached', async () => {
+    const token = await tokenFor()
+    const res = await request(app).get('/api/v1/jobs').set('Authorization', `Bearer ${token}`)
+    expect(res.headers['cache-control']).toBe('no-store')
+  })
+
+  it('rejects a token whose userId is not an id', async () => {
+    const jwt = (await import('jsonwebtoken')).default
+    const token = jwt.sign({ userId: { $ne: null }, name: 'x' }, process.env.JWT_SECRET)
+    const res = await request(app).get('/api/v1/jobs').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(401)
+  })
+
+  it('caps the number of jobs per user', async () => {
+    const token = await tokenFor()
+    const userId = (await User.findOne({ email: 'anna@test.com' }))._id
+    await Job.insertMany(Array.from({ length: 1000 }, () => ({ ...newJob, createdBy: userId })))
+    const res = await request(app).post('/api/v1/jobs').set('Authorization', `Bearer ${token}`).send(newJob)
+    expect(res.status).toBe(400)
+  })
+})
+
 const daysAgo = (n) => new Date(Date.now() - n * 864e5)
 
 describe('follow-ups', () => {
