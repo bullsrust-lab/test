@@ -4,7 +4,7 @@ A small job application tracker built with MongoDB, Express, React and Node. You
 
 Built as a test task for a junior MERN position.
 
-**Live:** LIVE_URL
+**Live:** https://jobtrail-two.vercel.app
 **Demo:** click "Look around with a demo account" on the login page (read-only, ~75 sample jobs).
 
 > Hosted on Vercel (React build on the CDN, the Express API as a serverless function) with MongoDB Atlas.
