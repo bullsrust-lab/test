@@ -1,0 +1,117 @@
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--tone);
+  border-radius: var(--radius);
+}
+
+.pending {
+  --tone: var(--pending);
+}
+
+.interview {
+  --tone: var(--interview);
+}
+
+.declined {
+  --tone: var(--declined);
+}
+
+.number {
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--tone);
+}
+
+.label {
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.share {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.chartCard {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.chartHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.chartHead h2 {
+  font-size: 16px;
+}
+
+.switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.switch button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.switch .on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.chart {
+  height: 300px;
+}
+
+@media (max-width: 700px) {
+  .tiles {
+    grid-template-columns: 1fr;
+  }
+
+  .tile {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 12px;
+  }
+
+  .number {
+    font-size: 26px;
+  }
+
+  .share {
+    margin-left: auto;
+  }
+
+  .chart {
+    height: 240px;
+  }
+}
