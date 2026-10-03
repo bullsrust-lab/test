@@ -30,6 +30,11 @@ const UserSchema = new mongoose.Schema(
       enum: ['user', 'demo'],
       default: 'user',
     },
+    // demo account only: when its sample data was last moved forward in time
+    demoRefreshedAt: {
+      type: Date,
+      select: false,
+    },
   },
   { timestamps: true }
 )

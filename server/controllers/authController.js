@@ -1,6 +1,7 @@
 import { StatusCodes } from 'http-status-codes'
 import User from '../models/User.js'
 import { BadRequestError, NotFoundError, UnauthenticatedError } from '../errors/index.js'
+import refreshDemo from '../utils/refreshDemo.js'
 
 const sendUser = (res, statusCode, user) => {
   res.status(statusCode).json({ user, token: user.createJWT() })
@@ -30,9 +31,16 @@ export const login = async (req, res) => {
 }
 
 export const loginDemo = async (req, res) => {
-  const user = await User.findOne({ role: 'demo' })
+  const user = await User.findOne({ role: 'demo' }).sort({ createdAt: 1 })
   if (!user) {
     throw new NotFoundError('Demo account is not set up yet')
+  }
+
+  try {
+    await refreshDemo(user._id)
+  } catch (error) {
+    // stale demo dates are not worth failing the login over
+    console.error('Could not refresh demo data', error.message)
   }
 
   sendUser(res, StatusCodes.OK, user)
