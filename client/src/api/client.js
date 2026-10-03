@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearAuth, getItem } from '../utils/storage'
+import { clearAuth, getItem, setSessionFlag } from '../utils/storage'
 
 const api = axios.create({ baseURL: '/api/v1' })
 
@@ -16,7 +16,7 @@ api.interceptors.response.use(
     const isAuthRoute = error.config?.url?.startsWith('/auth')
     if (error.response?.status === 401 && !isAuthRoute) {
       clearAuth()
-      sessionStorage.setItem('sessionExpired', '1')
+      setSessionFlag('sessionExpired')
       window.location.assign('/register')
     }
     return Promise.reject(error)

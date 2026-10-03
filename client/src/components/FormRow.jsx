@@ -1,7 +1,9 @@
 import styles from './Form.module.css'
 
-function FormRow({ label, name, error, type = 'text', children, ...inputProps }) {
-  const errorId = error ? `${name}-error` : undefined
+function FormRow({ label, name, error, hint, type = 'text', children, ...inputProps }) {
+  const errorId = `${name}-error`
+  const hintId = `${name}-hint`
+  const describedBy = [error && errorId, hint && !error && hintId].filter(Boolean).join(' ') || undefined
 
   return (
     <div className={styles.row}>
@@ -15,15 +17,21 @@ function FormRow({ label, name, error, type = 'text', children, ...inputProps })
           type={type}
           className={`${styles.input} ${error ? styles.invalid : ''}`}
           aria-invalid={Boolean(error)}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
           {...inputProps}
         />
         {children}
       </div>
-      {error && (
+      {error ? (
         <p id={errorId} className={styles.error}>
           {error}
         </p>
+      ) : (
+        hint && (
+          <p id={hintId} className={styles.hint}>
+            {hint}
+          </p>
+        )
       )}
     </div>
   )

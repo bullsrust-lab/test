@@ -5,25 +5,42 @@ import Logo from '../components/Logo'
 import { IconEye } from '../components/Icons'
 import api, { getErrorMessage, getFieldErrors } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import useDocumentTitle from '../hooks/useDocumentTitle'
+import { focusFirstError } from '../utils/forms'
+import { clearSessionFlag, getSessionFlag } from '../utils/storage'
 import styles from './Register.module.css'
 
 const initialValues = { name: '', email: '', password: '' }
 
+const validate = ({ name, email, password }, isMember) => {
+  const errors = {}
+  if (!isMember && name.trim().length < 2) errors.name = 'Name must be at least 2 characters'
+  if (!email.trim()) errors.email = 'Email is required'
+  else if (!/^\S+@\S+\.\S+$/.test(email.trim())) errors.email = 'Please provide a valid email'
+  if (!password) errors.password = 'Password is required'
+  else if (!isMember && password.length < 6) errors.password = 'Password must be at least 6 characters'
+  return errors
+}
+
 function Register() {
-  const [isMember, setIsMember] = useState(true)
+  // the demo banner sends people here to sign up, not to log in
+  const [isMember, setIsMember] = useState(() => !getSessionFlag('wantsSignup'))
   const [values, setValues] = useState(initialValues)
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(() =>
-    sessionStorage.getItem('sessionExpired') ? 'Your session has expired, please log in again.' : ''
+    getSessionFlag('sessionExpired') ? 'Your session has expired, please log in again.' : ''
   )
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const { token, login } = useAuth()
   const navigate = useNavigate()
 
+  useDocumentTitle(isMember ? 'Log in' : 'Create an account')
+
   useEffect(() => {
-    sessionStorage.removeItem('sessionExpired')
+    clearSessionFlag('sessionExpired')
+    clearSessionFlag('wantsSignup')
   }, [])
 
   if (token) return <Navigate to="/dashboard" replace />
@@ -50,6 +67,7 @@ function Register() {
     } catch (err) {
       const fields = getFieldErrors(err)
       setFieldErrors(fields)
+      focusFirstError(fields)
       // field errors are already shown under the inputs
       if (!Object.keys(fields).length) setError(getErrorMessage(err))
       setSubmitting(false)
@@ -58,6 +76,13 @@ function Register() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    const errors = validate(values, isMember)
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors)
+      setError('')
+      focusFirstError(errors)
+      return
+    }
     const { name, email, password } = values
     const body = isMember ? { email, password } : { name, email, password }
     authenticate(() => api.post(isMember ? '/auth/login' : '/auth/register', body))
@@ -118,6 +143,7 @@ function Register() {
               error={fieldErrors.password}
               autoComplete={isMember ? 'current-password' : 'new-password'}
               minLength={isMember ? undefined : 6}
+              hint={isMember ? undefined : 'At least 6 characters'}
               required
             >
               <button

@@ -4,6 +4,7 @@ import FormSelect from './FormSelect'
 import { getErrorMessage, getFieldErrors } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { EMPTY_JOB, JOB_TYPES, STATUS } from '../utils/constants'
+import { focusFirstError } from '../utils/forms'
 import styles from './JobForm.module.css'
 
 const validate = (values) => {
@@ -31,6 +32,7 @@ function JobForm({ initialValues = EMPTY_JOB, submitLabel, onSubmit, onCancel, d
     const clientErrors = validate(values)
     if (Object.keys(clientErrors).length) {
       setErrors(clientErrors)
+      focusFirstError(clientErrors)
       return
     }
 
@@ -39,7 +41,9 @@ function JobForm({ initialValues = EMPTY_JOB, submitLabel, onSubmit, onCancel, d
       const reset = await onSubmit(values)
       if (reset) setValues(EMPTY_JOB)
     } catch (error) {
-      setErrors(getFieldErrors(error))
+      const fields = getFieldErrors(error)
+      setErrors(fields)
+      focusFirstError(fields)
       toast.error(getErrorMessage(error))
     } finally {
       setSubmitting(false)

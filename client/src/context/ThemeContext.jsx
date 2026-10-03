@@ -1,25 +1,38 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react'
 import { getItem, setItem } from '../utils/storage'
 
 const ThemeContext = createContext(null)
 
-const initialTheme = () => {
+const darkQuery = () => window.matchMedia('(prefers-color-scheme: dark)')
+
+const savedTheme = () => {
   const saved = getItem('theme')
-  if (saved === 'light' || saved === 'dark') return saved
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return saved === 'light' || saved === 'dark' ? saved : null
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(initialTheme)
+  // null = follow the system setting, CSS handles that with a media query
+  const [saved, setSaved] = useState(savedTheme)
+  const [system, setSystem] = useState(() => (darkQuery().matches ? 'dark' : 'light'))
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
+    const query = darkQuery()
+    const onChange = (e) => setSystem(e.matches ? 'dark' : 'light')
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (saved) document.documentElement.dataset.theme = saved
+    else delete document.documentElement.dataset.theme
+  }, [saved])
+
+  const theme = saved || system
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setItem('theme', next)
-    setTheme(next)
+    setSaved(next)
   }
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>

@@ -1,10 +1,11 @@
-import { Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import Spinner from '../components/Spinner'
 import ThemeToggle from '../components/ThemeToggle'
 import { IconChart, IconClose, IconList, IconLogout, IconMenu, IconPlus, IconUser } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
+import { setSessionFlag } from '../utils/storage'
 import styles from './DashboardLayout.module.css'
 
 const links = [
@@ -24,18 +25,66 @@ const initials = (name = '') =>
 
 function DashboardLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { pathname } = useLocation()
+  const [lastPath, setLastPath] = useState(pathname)
   const { user, isDemo, logout } = useAuth()
   const navigate = useNavigate()
+  const menuBtnRef = useRef(null)
+  const closeBtnRef = useRef(null)
+  const mainRef = useRef(null)
+  const firstRender = useRef(true)
+
+  // any navigation closes the mobile menu (links, logo, back button)
+  if (pathname !== lastPath) {
+    setLastPath(pathname)
+    setMenuOpen(false)
+  }
+
+  const closeMenu = () => {
+    setMenuOpen(false)
+    menuBtnRef.current?.focus()
+  }
+
   useEffect(() => {
     if (!menuOpen) return
-    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false)
+    closeBtnRef.current?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        menuBtnRef.current?.focus()
+      }
+    }
+    // the drawer only exists on small screens, don't leave the page inert after resizing
+    const wide = window.matchMedia('(min-width: 961px)')
+    const onResize = (e) => e.matches && setMenuOpen(false)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    wide.addEventListener('change', onResize)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      wide.removeEventListener('change', onResize)
+    }
   }, [menuOpen])
+
+  // after moving to another page, start keyboard / screen reader users at the new content
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    if (!mainRef.current?.contains(document.activeElement)) mainRef.current?.focus({ preventScroll: true })
+  }, [pathname])
 
   const handleLogout = () => {
     logout()
     navigate('/')
+  }
+
+  // a flag rather than router state: logging out also triggers the protected route's own
+  // redirect to /register, and whichever navigation lands last would drop the state
+  const signUp = () => {
+    setSessionFlag('wantsSignup')
+    logout()
+    navigate('/register')
   }
 
   return (
@@ -44,9 +93,10 @@ function DashboardLayout() {
         <div className={styles.sidebarTop}>
           <Logo to="/dashboard" />
           <button
+            ref={closeBtnRef}
             type="button"
             className={`${styles.iconBtn} ${styles.closeBtn}`}
-            onClick={() => setMenuOpen(false)}
+            onClick={closeMenu}
             aria-label="Close menu"
           >
             <IconClose />
@@ -55,12 +105,7 @@ function DashboardLayout() {
 
         <nav className={styles.nav} aria-label="Dashboard">
           {links.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-              onClick={() => setMenuOpen(false)}
-            >
+            <NavLink key={to} to={to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
               <Icon />
               {label}
             </NavLink>
@@ -73,11 +118,12 @@ function DashboardLayout() {
         </button>
       </aside>
 
-      {menuOpen && <div className={styles.overlay} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+      {menuOpen && <div className={styles.overlay} onClick={closeMenu} aria-hidden="true" />}
 
-      <div className={styles.main}>
+      <div className={styles.main} inert={menuOpen || undefined}>
         <header className={styles.topbar}>
           <button
+            ref={menuBtnRef}
             type="button"
             className={`${styles.iconBtn} ${styles.menuBtn}`}
             onClick={() => setMenuOpen(true)}
@@ -102,14 +148,14 @@ function DashboardLayout() {
         {isDemo && (
           <p className={styles.demoBanner}>
             You're looking at a demo account, so editing is turned off.{' '}
-            <button type="button" onClick={() => { logout(); navigate('/register') }}>
+            <button type="button" onClick={signUp}>
               Create your own account
             </button>{' '}
             to track real applications.
           </p>
         )}
 
-        <main className={styles.content}>
+        <main className={styles.content} ref={mainRef} tabIndex={-1}>
           <Suspense fallback={<Spinner />}>
             <Outlet />
           </Suspense>

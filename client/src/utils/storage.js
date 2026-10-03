@@ -24,6 +24,31 @@ export const removeItem = (key) => {
   }
 }
 
+// one-off flags between pages (e.g. "session expired"), same try/catch reasoning
+export const getSessionFlag = (key) => {
+  try {
+    return sessionStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+export const clearSessionFlag = (key) => {
+  try {
+    sessionStorage.removeItem(key)
+  } catch {
+    /* ignore */
+  }
+}
+
+export const setSessionFlag = (key) => {
+  try {
+    sessionStorage.setItem(key, '1')
+  } catch {
+    /* ignore */
+  }
+}
+
 export const getStoredUser = () => {
   try {
     return JSON.parse(getItem('user'))

@@ -7,6 +7,7 @@
   --surface-2: #efebe2;
   --border: #ddd8cc;
   --border-strong: #c9c3b4;
+  --input-border: #8f8a7e;
   --text: #1b1a17;
   --text-muted: #6b675e;
   --accent: #1f6f50;
@@ -15,20 +16,27 @@
   --on-accent: #f7f5ef;
   --danger: #b4372b;
   --danger-soft: #f6e0dc;
+  --on-danger: #fff;
 
-  --pending: #9a6a00;
+  --pending: #7a5400;
   --pending-bg: #f6ead0;
   --interview: #245fa8;
   --interview-bg: #dee8f5;
   --declined: #a63a2f;
   --declined-bg: #f5e0dc;
 
+  /* cards of applications that never got an answer */
+  --paper-aged: #f4ecd8;
+  --paper-aged-border: #e2d6b8;
+
+  --toast-ok: #7cd3a8;
+  --toast-err: #f19a8c;
+
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
   --shadow: 0 1px 2px rgb(40 35 25 / 6%), 0 1px 1px rgb(40 35 25 / 4%);
   --shadow-lg: 0 12px 32px rgb(40 35 25 / 14%);
-  --focus: 0 0 0 3px rgb(31 111 80 / 35%);
 
   --sidebar-w: 236px;
   --topbar-h: 64px;
@@ -36,6 +44,7 @@
   color-scheme: light;
 }
 
+/* the dark palette is written twice: once for "follow the system", once for an explicit choice */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     --bg: #141412;
@@ -43,6 +52,7 @@
     --surface-2: #24241f;
     --border: #2e2d29;
     --border-strong: #403e38;
+    --input-border: #757166;
     --text: #ece8df;
     --text-muted: #9a958a;
     --accent: #4fae86;
@@ -51,15 +61,19 @@
     --on-accent: #0f1a15;
     --danger: #e0705f;
     --danger-soft: #3a211d;
+    --on-danger: #1c0f0c;
     --pending: #e2b250;
     --pending-bg: #3a2f17;
     --interview: #7fb0ec;
     --interview-bg: #1c2b3f;
     --declined: #e88a7c;
     --declined-bg: #3d221e;
+    --paper-aged: #221f17;
+    --paper-aged-border: #3a3324;
+    --toast-ok: #1a7a52;
+    --toast-err: #b4372b;
     --shadow: 0 1px 2px rgb(0 0 0 / 40%);
     --shadow-lg: 0 12px 32px rgb(0 0 0 / 50%);
-    --focus: 0 0 0 3px rgb(79 174 134 / 40%);
     color-scheme: dark;
   }
 }
@@ -70,6 +84,7 @@
   --surface-2: #24241f;
   --border: #2e2d29;
   --border-strong: #403e38;
+  --input-border: #757166;
   --text: #ece8df;
   --text-muted: #9a958a;
   --accent: #4fae86;
@@ -78,14 +93,18 @@
   --on-accent: #0f1a15;
   --danger: #e0705f;
   --danger-soft: #3a211d;
+  --on-danger: #1c0f0c;
   --pending: #e2b250;
   --pending-bg: #3a2f17;
   --interview: #7fb0ec;
   --interview-bg: #1c2b3f;
   --declined: #e88a7c;
   --declined-bg: #3d221e;
+  --paper-aged: #221f17;
+  --paper-aged-border: #3a3324;
+  --toast-ok: #1a7a52;
+  --toast-err: #b4372b;
   --shadow: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 50%);
-  --focus: 0 0 0 3px rgb(79 174 134 / 40%);
   color-scheme: dark;
 }

@@ -20,7 +20,7 @@
   height: 40px;
   padding: 0 12px;
   background: var(--surface);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--input-border);
   border-radius: var(--radius-sm);
   transition: border-color 0.15s;
 }
@@ -36,6 +36,7 @@
 
 .input:focus-visible {
   border-color: var(--accent);
+  outline-offset: 0;
 }
 
 .select {
@@ -53,4 +54,16 @@
 .error {
   font-size: 13px;
   color: var(--danger);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* below 16px iOS Safari zooms the whole page when an input gets focus */
+@media (max-width: 960px) {
+  .input {
+    font-size: 16px;
+  }
 }

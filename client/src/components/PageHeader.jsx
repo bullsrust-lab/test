@@ -1,6 +1,9 @@
+import useDocumentTitle from '../hooks/useDocumentTitle'
 import styles from './PageHeader.module.css'
 
 function PageHeader({ title, subtitle, children }) {
+  useDocumentTitle(title)
+
   return (
     <div className={styles.header}>
       <div>

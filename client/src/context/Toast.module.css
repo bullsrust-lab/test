@@ -44,12 +44,12 @@
   opacity: 1;
 }
 
-.success svg:first-child {
-  color: #7cd3a8;
+.success > svg:first-child {
+  color: var(--toast-ok);
 }
 
-.error svg:first-child {
-  color: #f19a8c;
+.error > svg:first-child {
+  color: var(--toast-err);
 }
 
 @keyframes slide-in {

@@ -6,6 +6,7 @@ import Spinner from '../components/Spinner'
 import api, { getErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import styles from './AllJobs.module.css'
 
 function EditJob() {
   const { id } = useParams()
@@ -25,7 +26,10 @@ function EditJob() {
       .get(`/jobs/${id}`, { signal: controller.signal })
       .then(({ data }) => setJob(data.job))
       .catch((err) => {
-        if (!controller.signal.aborted) setError(getErrorMessage(err))
+        if (controller.signal.aborted) return
+        setError(
+          err.response?.status === 404 ? "This job doesn't exist or was deleted" : getErrorMessage(err)
+        )
       })
     return () => controller.abort()
   }, [id])
@@ -40,9 +44,12 @@ function EditJob() {
     return (
       <>
         <PageHeader title="Edit job" />
-        <p>
-          {error}. <Link to="/dashboard/all-jobs">Back to all jobs</Link>
-        </p>
+        <div className={styles.error} role="alert">
+          <span>{error}</span>
+          <Link to="/dashboard/all-jobs" className="btn btn-ghost btn-sm">
+            Back to all jobs
+          </Link>
+        </div>
       </>
     )
   }

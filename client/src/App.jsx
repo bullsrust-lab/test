@@ -16,7 +16,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Suspense fallback={<Spinner full />}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -35,6 +35,7 @@ function App() {
             <Route path="edit-job/:id" element={<EditJob />} />
             <Route path="stats" element={<Stats />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="*" element={<NotFound inDashboard />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
