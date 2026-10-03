@@ -7,7 +7,7 @@ Built as a test task for a junior MERN position.
 **Live:** LIVE_URL
 **Demo:** click "Look around with a demo account" on the login page (read-only, ~75 sample jobs).
 
-> The app runs on Render's free plan, so the first request after a while can take up to a minute while the server wakes up.
+> Hosted on Vercel (React build on the CDN, the Express API as a serverless function) with MongoDB Atlas.
 
 ![All jobs page with the follow-up panel](docs/jobs-light.png)
 
@@ -148,7 +148,7 @@ All routes are under `/api/v1`. Errors always come back as `{ "msg": "..." }`; v
 | PATCH  | `/jobs/:id`       | yes  | owner only                              |
 | DELETE | `/jobs/:id`       | yes  | owner only                              |
 | POST   | `/jobs/:id/follow-up` | yes | owner only, resets the follow-up timer |
-| GET    | `/health`         | no   | used by Render's health check           |
+| GET    | `/health`         | no   | health check                            |
 
 `GET /jobs` query params: `status` (`all`, `pending`, `interview`, `declined`), `jobType` (`all`, `full-time`, `part-time`, `remote`), `sort` (`latest`, `oldest`, `a-z`, `z-a`), `search`, `page` (default 1), `limit` (default 10, max 50).
 
@@ -158,20 +158,29 @@ All routes are under `/api/v1`. Errors always come back as `{ "msg": "..." }`; v
 
 Status codes: 200, 201, 400 (validation, bad id), 401 (no/invalid token, wrong credentials), 403 (someone else's job, demo user writes), 404, 413 (body over 10 kB), 429 (rate limits).
 
-## Deploying to Render
+## Deploying
 
-One Web Service serves both the API and the built React app, so there's no CORS setup. There's a `render.yaml` in the repo, so the easiest way is New → Blueprint and point it at the repo. Render generates `JWT_SECRET` itself and only asks for `MONGO_URI`.
+The same Express app runs two ways, so it can go on either host.
 
-Or set it up by hand:
+### Vercel (what the live link uses)
 
-- Build command: `npm ci --include=dev && npm run build` (dev deps are needed for the Vite build)
-- Start command: `npm start`
-- Health check path: `/api/v1/health`
-- Environment: the variables above with `NODE_ENV=production` (Render sets `PORT` itself), plus `MONGOMS_DISABLE_POSTINSTALL=1` so the test-only in-memory MongoDB isn't downloaded on every build
+`vercel.json` builds the client into `client/dist` (served from Vercel's CDN) and sends `/api/*` to `api/index.mjs`, a small wrapper that runs the Express app as one serverless function and reuses the MongoDB connection while the function is warm.
 
-In Atlas, Network Access has to allow `0.0.0.0/0` because Render's outbound IPs aren't fixed on the free plan.
+1. Import the repo in Vercel (no framework preset needed, `vercel.json` has the settings).
+2. Add environment variables: `MONGO_URI` and `JWT_SECRET` (32+ random characters, see the command above). Vercel sets `NODE_ENV` itself.
+3. Deploy.
 
-The demo account needs data: run `npm run seed` once locally with `MONGO_URI` in `.env` set to the same database Render uses. Without it the demo button answers 404. After that the demo keeps itself fresh: on demo login the sample dates are moved forward (at most every 12 hours), so the follow-up panel always has something to show.
+The API rate limits keep their counters in memory, so on serverless each warm instance counts on its own. Good enough for a demo; a shared store (Redis) would be the fix for real traffic.
+
+### Render
+
+`render.yaml` describes one Web Service that serves both the API and the built React app. New → Blueprint, point it at the repo, and fill in `MONGO_URI` (Render generates `JWT_SECRET`). By hand: build `npm ci --include=dev && npm run build`, start `npm start`, health check `/api/v1/health`, plus `NODE_ENV=production` and `MONGOMS_DISABLE_POSTINSTALL=1` so the test-only in-memory MongoDB isn't downloaded on every build. The free plan sleeps after 15 minutes, so the first request can take up to a minute.
+
+### Both
+
+In Atlas, Network Access has to allow `0.0.0.0/0`: neither host has fixed outbound IPs on the free plan.
+
+The demo account needs data: run `npm run seed` once locally with `MONGO_URI` in `.env` set to the same database the host uses. Without it the demo button answers 404. After that the demo keeps itself fresh: on demo login the sample dates are moved forward (at most every 12 hours), so the follow-up panel always has something to show.
 
 ## Notes
 

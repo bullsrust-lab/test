@@ -13,7 +13,7 @@
     "start": "npm start -w server",
     "seed": "npm run seed -w server",
     "test": "npm test -w server",
-    "lint": "oxlint -c .oxlintrc.json --deny-warnings client/src server"
+    "lint": "oxlint -c .oxlintrc.json --deny-warnings client/src server api"
   },
   "devDependencies": {
     "concurrently": "^9.2.4",

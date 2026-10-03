@@ -20,7 +20,7 @@ const clientDist = path.resolve(__dirname, '../client/dist')
 
 const app = express()
 
-// Render sits behind a proxy, needed for the rate limiter to see real IPs
+// Render and Vercel sit behind a proxy, needed for the rate limiter to see real IPs
 app.set('trust proxy', 1)
 app.disable('x-powered-by')
 
