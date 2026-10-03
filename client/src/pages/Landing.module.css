@@ -97,7 +97,7 @@
   font-weight: 600;
 }
 
-.ledgerHead .mono {
+.ledgerHead :global(.mono) {
   font-weight: 400;
   color: var(--text-muted);
 }
@@ -137,6 +137,12 @@
 .ledgerMain span {
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.ledgerQuiet {
+  font-size: 12px;
+  font-style: normal;
+  color: var(--declined);
 }
 
 .ledgerDate {

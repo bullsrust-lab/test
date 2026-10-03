@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import PageHeader from '../components/PageHeader'
 import Spinner from '../components/Spinner'
@@ -21,25 +22,59 @@ function Stats() {
   const [stats, setStats] = useState(null)
   const [error, setError] = useState('')
   const [chart, setChart] = useState('bar')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    const controller = new AbortController()
+    setError('')
     api
-      .get('/jobs/stats')
+      .get('/jobs/stats', { signal: controller.signal })
       .then(({ data }) => setStats(data))
-      .catch((err) => setError(getErrorMessage(err)))
-  }, [])
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(getErrorMessage(err))
+      })
+    return () => controller.abort()
+  }, [reloadKey])
 
-  if (error) return <p>{error}</p>
+  if (error) {
+    return (
+      <>
+        <PageHeader title="Stats" />
+        <div className={styles.error} role="alert">
+          <span>{error}</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReloadKey((k) => k + 1)}>
+            Try again
+          </button>
+        </div>
+      </>
+    )
+  }
   if (!stats) return <Spinner />
 
-  const { defaultStats, monthlyApplications } = stats
+  const { defaultStats, monthlyApplications, replyTime } = stats
   const total = Object.values(defaultStats).reduce((a, b) => a + b, 0)
+
+  if (total === 0) {
+    return (
+      <>
+        <PageHeader title="Stats" />
+        <div className={styles.empty}>
+          <h2>No applications yet</h2>
+          <p>Stats show up once you've added a few jobs.</p>
+          <Link to="/dashboard/add-job" className="btn btn-primary">
+            Add a job
+          </Link>
+        </div>
+      </>
+    )
+  }
+
   const data = monthlyApplications.map((m) => ({ ...m, month: m.date.split(' ')[0] }))
   const Chart = chart === 'bar' ? BarChart : AreaChart
 
   return (
     <>
-      <PageHeader title="Stats" subtitle={`${total} applications in total`} />
+      <PageHeader title="Stats" subtitle={`${total} ${total === 1 ? 'application' : 'applications'} in total`} />
 
       <div className={styles.tiles}>
         {tiles.map(({ key, label }) => (
@@ -52,6 +87,18 @@ function Stats() {
           </div>
         ))}
       </div>
+
+      <p className={styles.replyLine}>
+        {replyTime ? (
+          <>
+            Median time to a reply: <b className="mono">{replyTime.medianDays}</b>{' '}
+            {replyTime.medianDays === 1 ? 'day' : 'days'}, across {replyTime.replies}{' '}
+            {replyTime.replies === 1 ? 'reply' : 'replies'}.
+          </>
+        ) : (
+          "No reply times yet. They're recorded when you move a job out of pending."
+        )}
+      </p>
 
       <section className={styles.chartCard}>
         <div className={styles.chartHead}>

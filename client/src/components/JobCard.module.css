@@ -67,6 +67,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 14px;
   border-top: 1px dashed var(--border);
@@ -84,4 +85,40 @@
 
 .delete:hover:not(:disabled) {
   background: var(--danger-soft);
+}
+
+.quiet {
+  color: var(--pending);
+}
+
+.card[data-quiet='ghosted'] {
+  background: var(--paper-aged);
+  border-color: var(--paper-aged-border);
+}
+
+.card[data-quiet='ghosted'] .quiet {
+  color: var(--declined);
+}
+
+/* rubber stamp on applications that have been ignored for a month or more */
+.stamp {
+  margin-left: auto;
+  align-self: center;
+  padding: 2px 8px;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  color: var(--declined);
+  font: 500 12px/1.4 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+  opacity: 0.8;
+  animation: stamp 0.2s ease-out both;
+}
+
+@keyframes stamp {
+  from {
+    transform: rotate(-6deg) scale(1.5);
+    opacity: 0;
+  }
 }

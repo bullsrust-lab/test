@@ -2,20 +2,28 @@ import { Link } from 'react-router-dom'
 import dayjs from 'dayjs'
 import StatusBadge from './StatusBadge'
 import { capitalize } from '../utils/constants'
-import { IconBriefcase, IconCalendar, IconEdit, IconPin, IconTrash } from './Icons'
+import { followUpState } from '../utils/followUp'
+import { IconBriefcase, IconCalendar, IconClock, IconEdit, IconPin, IconTrash } from './Icons'
 import styles from './JobCard.module.css'
 
 function JobCard({ job, onDelete, readOnly, editSearch }) {
   const { _id, position, company, jobLocation, jobType, status, createdAt } = job
+  const quiet = followUpState(job)
+  const label = (
+    <span className="visually-hidden">
+      {' '}
+      {position} at {company}
+    </span>
+  )
 
   return (
-    <article className={styles.card}>
+    <article className={styles.card} data-quiet={quiet?.level}>
       <header className={styles.head}>
         <div className={styles.initial} aria-hidden="true">
           {company.charAt(0)}
         </div>
         <div className={styles.titles}>
-          <h3 className={styles.position}>{position}</h3>
+          <h2 className={styles.position}>{position}</h2>
           <p className={styles.company}>{company}</p>
         </div>
         <StatusBadge status={status} />
@@ -36,6 +44,14 @@ function JobCard({ job, onDelete, readOnly, editSearch }) {
             {dayjs(createdAt).format('MMM D, YYYY')}
           </time>
         </li>
+        {quiet && (
+          <li className={styles.quiet}>
+            <IconClock size={15} />
+            <span className="mono">
+              {status === 'interview' ? `No news for ${quiet.days} days` : `${quiet.days} days, no reply`}
+            </span>
+          </li>
+        )}
       </ul>
 
       <footer className={styles.actions}>
@@ -47,7 +63,7 @@ function JobCard({ job, onDelete, readOnly, editSearch }) {
           onClick={(e) => readOnly && e.preventDefault()}
         >
           <IconEdit size={15} />
-          Edit
+          Edit{label}
         </Link>
         <button
           type="button"
@@ -56,8 +72,14 @@ function JobCard({ job, onDelete, readOnly, editSearch }) {
           disabled={readOnly}
         >
           <IconTrash size={15} />
-          Delete
+          Delete{label}
         </button>
+        {quiet?.level === 'ghosted' && (
+          // decorative, the same information is already in the meta line above
+          <span className={styles.stamp} aria-hidden="true">
+            No reply
+          </span>
+        )}
       </footer>
     </article>
   )

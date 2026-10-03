@@ -3,13 +3,14 @@ import Logo from '../components/Logo'
 import StatusBadge from '../components/StatusBadge'
 import ThemeToggle from '../components/ThemeToggle'
 import { useAuth } from '../context/AuthContext'
+import useDocumentTitle from '../hooks/useDocumentTitle'
 import styles from './Landing.module.css'
 
 const sample = [
   { position: 'Junior Frontend Developer', company: 'Aviva', status: 'interview', date: 'Sep 29' },
   { position: 'IT Support Analyst', company: 'Norfolk County Council', status: 'pending', date: 'Sep 27' },
   { position: 'React Developer', company: 'Brightside', status: 'pending', date: 'Sep 24' },
-  { position: 'Web Developer (Remote)', company: 'Halo Studio', status: 'declined', date: 'Sep 18' },
+  { position: 'Web Developer (Remote)', company: 'Halo Studio', status: 'pending', date: 'Aug 30', quiet: '34d, no reply' },
   { position: 'Graduate Software Engineer', company: 'Lotus Cars', status: 'interview', date: 'Sep 12' },
 ]
 
@@ -23,6 +24,10 @@ const steps = [
     text: 'Pending, interview or declined. The status is what you will glance at most, so it is colour coded.',
   },
   {
+    title: 'Know when to follow up',
+    text: 'After ten days without a reply the job moves into a short list, with a polite check-in email ready to copy. A month of silence gets it stamped "no reply" so you can stop waiting.',
+  },
+  {
     title: 'Find anything fast',
     text: 'Search by position, filter by status or type, sort by date or name. Filters stay in the URL, so the back button works.',
   },
@@ -32,6 +37,7 @@ const year = new Date().getFullYear()
 
 function Landing() {
   const { token } = useAuth()
+  useDocumentTitle()
 
   return (
     <div className={styles.page}>
@@ -77,7 +83,10 @@ function Landing() {
                 <li key={job.position}>
                   <div className={styles.ledgerMain}>
                     <b>{job.position}</b>
-                    <span>{job.company}</span>
+                    <span>
+                      {job.company}
+                      {job.quiet && <em className={`mono ${styles.ledgerQuiet}`}> · {job.quiet}</em>}
+                    </span>
                   </div>
                   <StatusBadge status={job.status} />
                   <span className={`mono ${styles.ledgerDate}`}>{job.date}</span>
