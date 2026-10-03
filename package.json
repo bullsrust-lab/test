@@ -13,13 +13,13 @@
     "start": "npm start -w server",
     "seed": "npm run seed -w server",
     "test": "npm test -w server",
-    "lint": "oxlint -c .oxlintrc.json client/src server"
+    "lint": "oxlint -c .oxlintrc.json --deny-warnings client/src server"
   },
   "devDependencies": {
     "concurrently": "^9.2.4",
     "oxlint": "^1.86.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }

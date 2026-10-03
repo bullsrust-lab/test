@@ -45,6 +45,8 @@ app.use('/api/v1/jobs', auth, demoUser, jobsRoutes)
 app.use('/api', notFound)
 
 if (process.env.NODE_ENV === 'production') {
+  // vite puts a content hash in every asset name, so they can be cached for good
+  app.use('/assets', express.static(path.join(clientDist, 'assets'), { immutable: true, maxAge: '1y' }))
   app.use(express.static(clientDist))
   // react-router handles the rest, but a missing file like /assets/x.js should still 404
   app.get('*', (req, res, next) => {

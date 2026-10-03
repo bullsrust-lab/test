@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/v1/health
     envVars:
@@ -12,6 +12,9 @@ services:
         value: production
       - key: NODE_VERSION
         value: 22
+      # the test-only mongodb-memory-server would otherwise download a MongoDB binary on every deploy
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "1"
       - key: JWT_LIFETIME
         value: 1d
       - key: JWT_SECRET
