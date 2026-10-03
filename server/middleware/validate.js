@@ -16,35 +16,54 @@ const withErrors = (rules) => [
   },
 ]
 
+// every text field is checked with isString() first: arrays/objects/numbers in JSON
+// would otherwise reach the sanitizers or bcrypt and blow up with a 500
 const name = () =>
-  body('name').trim().isLength({ min: 2, max: 50 }).withMessage('Name must be 2-50 characters')
+  body('name')
+    .isString()
+    .withMessage('Name is required')
+    .bail()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be 2-50 characters')
 
 const email = () =>
   body('email')
+    .isString()
+    .withMessage('Email is required')
+    .bail()
     .trim()
     .notEmpty()
     .withMessage('Email is required')
     .bail()
     .isEmail()
     .withMessage('Please provide a valid email')
-    .customSanitizer((value) => value.toLowerCase())
+    .toLowerCase()
 
 export const validateRegister = withErrors([
   name(),
   email(),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password')
+    .isString()
+    .withMessage('Password is required')
+    .bail()
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters')
+    // bcrypt only looks at the first 72 bytes, anything after that would be silently ignored
+    .custom((value) => Buffer.byteLength(value, 'utf8') <= 72)
+    .withMessage('Password is too long'),
 ])
 
 export const validateLogin = withErrors([
   email(),
-  body('password').notEmpty().withMessage('Password is required'),
+  body('password').isString().withMessage('Password is required').bail().notEmpty().withMessage('Password is required'),
 ])
 
 export const validateUpdateUser = withErrors([name(), email()])
 
 const jobField = (field, label, max, optional) => {
   let chain = body(field)
-  if (optional) chain = chain.optional()
+  chain = optional ? chain.optional() : chain.exists({ values: 'falsy' }).withMessage(`${label} is required`).bail()
   return chain
     .isString()
     .withMessage(`${label} must be text`)
@@ -56,12 +75,15 @@ const jobField = (field, label, max, optional) => {
     .withMessage(`${label} is too long (max ${max})`)
 }
 
+const enumField = (field, values, msg) =>
+  body(field).optional().isString().withMessage(msg).bail().isIn(values).withMessage(msg)
+
 const jobRules = (optional) => [
   jobField('company', 'Company', 60, optional),
   jobField('position', 'Position', 100, optional),
   jobField('jobLocation', 'Location', 80, optional),
-  body('status').optional().isIn(JOB_STATUS).withMessage('Invalid status'),
-  body('jobType').optional().isIn(JOB_TYPE).withMessage('Invalid job type'),
+  enumField('status', JOB_STATUS, 'Invalid status'),
+  enumField('jobType', JOB_TYPE, 'Invalid job type'),
 ]
 
 export const validateJob = withErrors(jobRules(false))

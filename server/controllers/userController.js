@@ -1,10 +1,12 @@
 import { StatusCodes } from 'http-status-codes'
 import User from '../models/User.js'
-import { BadRequestError, NotFoundError } from '../errors/index.js'
+import { BadRequestError, UnauthenticatedError } from '../errors/index.js'
 
+// a valid token for a user that no longer exists is treated like an invalid session,
+// so the client's 401 handler logs it out instead of getting stuck
 export const getCurrentUser = async (req, res) => {
   const user = await User.findById(req.user.userId)
-  if (!user) throw new NotFoundError('User not found')
+  if (!user) throw new UnauthenticatedError()
 
   res.status(StatusCodes.OK).json({ user })
 }
@@ -16,7 +18,7 @@ export const updateUser = async (req, res) => {
   if (taken) throw new BadRequestError('Email already in use')
 
   const user = await User.findById(req.user.userId)
-  if (!user) throw new NotFoundError('User not found')
+  if (!user) throw new UnauthenticatedError()
 
   user.name = name
   user.email = email
