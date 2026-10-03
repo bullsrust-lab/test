@@ -1,0 +1,91 @@
+:root {
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+
+  --bg: #f4f1ea;
+  --surface: #fbfaf6;
+  --surface-2: #efebe2;
+  --border: #ddd8cc;
+  --border-strong: #c9c3b4;
+  --text: #1b1a17;
+  --text-muted: #6b675e;
+  --accent: #1f6f50;
+  --accent-hover: #185a41;
+  --accent-soft: #dcebe3;
+  --on-accent: #f7f5ef;
+  --danger: #b4372b;
+  --danger-soft: #f6e0dc;
+
+  --pending: #9a6a00;
+  --pending-bg: #f6ead0;
+  --interview: #245fa8;
+  --interview-bg: #dee8f5;
+  --declined: #a63a2f;
+  --declined-bg: #f5e0dc;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 2px rgb(40 35 25 / 6%), 0 1px 1px rgb(40 35 25 / 4%);
+  --shadow-lg: 0 12px 32px rgb(40 35 25 / 14%);
+  --focus: 0 0 0 3px rgb(31 111 80 / 35%);
+
+  --sidebar-w: 236px;
+  --topbar-h: 64px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141412;
+    --surface: #1c1c19;
+    --surface-2: #24241f;
+    --border: #2e2d29;
+    --border-strong: #403e38;
+    --text: #ece8df;
+    --text-muted: #9a958a;
+    --accent: #4fae86;
+    --accent-hover: #63c299;
+    --accent-soft: #1f3a2f;
+    --on-accent: #0f1a15;
+    --danger: #e0705f;
+    --danger-soft: #3a211d;
+    --pending: #e2b250;
+    --pending-bg: #3a2f17;
+    --interview: #7fb0ec;
+    --interview-bg: #1c2b3f;
+    --declined: #e88a7c;
+    --declined-bg: #3d221e;
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 50%);
+    --focus: 0 0 0 3px rgb(79 174 134 / 40%);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #141412;
+  --surface: #1c1c19;
+  --surface-2: #24241f;
+  --border: #2e2d29;
+  --border-strong: #403e38;
+  --text: #ece8df;
+  --text-muted: #9a958a;
+  --accent: #4fae86;
+  --accent-hover: #63c299;
+  --accent-soft: #1f3a2f;
+  --on-accent: #0f1a15;
+  --danger: #e0705f;
+  --danger-soft: #3a211d;
+  --pending: #e2b250;
+  --pending-bg: #3a2f17;
+  --interview: #7fb0ec;
+  --interview-bg: #1c2b3f;
+  --declined: #e88a7c;
+  --declined-bg: #3d221e;
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 50%);
+  --focus: 0 0 0 3px rgb(79 174 134 / 40%);
+  color-scheme: dark;
+}
