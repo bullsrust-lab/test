@@ -1,0 +1,27 @@
+import { StatusCodes } from 'http-status-codes'
+import User from '../models/User.js'
+import { BadRequestError, NotFoundError } from '../errors/index.js'
+
+export const getCurrentUser = async (req, res) => {
+  const user = await User.findById(req.user.userId)
+  if (!user) throw new NotFoundError('User not found')
+
+  res.status(StatusCodes.OK).json({ user })
+}
+
+export const updateUser = async (req, res) => {
+  const { name, email } = req.body
+
+  const taken = await User.exists({ email, _id: { $ne: req.user.userId } })
+  if (taken) throw new BadRequestError('Email already in use')
+
+  const user = await User.findById(req.user.userId)
+  if (!user) throw new NotFoundError('User not found')
+
+  user.name = name
+  user.email = email
+  await user.save()
+
+  // name is part of the token payload, so hand out a fresh one
+  res.status(StatusCodes.OK).json({ user, token: user.createJWT() })
+}
