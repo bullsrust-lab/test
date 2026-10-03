@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import FollowUps from '../components/FollowUps'
 import JobCard from '../components/JobCard'
 import JobsFilters from '../components/JobsFilters'
 import Modal from '../components/Modal'
@@ -13,22 +14,26 @@ import { PAGE_SIZE } from '../utils/constants'
 import styles from './AllJobs.module.css'
 
 const DEFAULTS = { search: '', status: 'all', jobType: 'all', sort: 'latest' }
+const EMPTY = { jobs: [], totalJobs: 0, numOfPages: 0 }
 
 function AllJobs() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [data, setData] = useState({ jobs: [], totalJobs: 0, numOfPages: 0 })
+  const navigate = useNavigate()
+  const [data, setData] = useState(EMPTY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toDelete, setToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const countRef = useRef(null)
   const { isDemo } = useAuth()
   const toast = useToast()
 
   const filters = Object.fromEntries(
     Object.entries(DEFAULTS).map(([key, value]) => [key, searchParams.get(key) ?? value])
   )
-  const page = Math.max(1, Number(searchParams.get('page')) || 1)
+  // same parsing as the server, so "?page=2abc" means page 2 on both sides
+  const page = Math.max(1, Number.parseInt(searchParams.get('page'), 10) || 1)
   const query = searchParams.toString()
 
   useEffect(() => {
@@ -36,50 +41,65 @@ function AllJobs() {
     setLoading(true)
     setError('')
 
+    const params = new URLSearchParams(query)
     api
-      .get('/jobs', { params: { ...Object.fromEntries(new URLSearchParams(query)), limit: PAGE_SIZE }, signal: controller.signal })
-      .then(({ data }) => setData(data))
-      .catch((err) => {
-        if (!controller.signal.aborted) setError(getErrorMessage(err))
+      .get('/jobs', { params: { ...Object.fromEntries(params), limit: PAGE_SIZE }, signal: controller.signal })
+      .then(({ data }) => {
+        // the page in the URL can be past the end (old link, last job on the page deleted, ...)
+        const requested = Number.parseInt(params.get('page'), 10) || 1
+        if (data.numOfPages > 0 && requested > data.numOfPages) {
+          if (data.numOfPages === 1) params.delete('page')
+          else params.set('page', String(data.numOfPages))
+          navigate({ search: `?${params}` }, { replace: true })
+          return
+        }
+        setData(data)
+        setLoading(false)
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
+      .catch((err) => {
+        if (controller.signal.aborted) return
+        setData(EMPTY)
+        setError(getErrorMessage(err))
+        setLoading(false)
       })
 
     return () => controller.abort()
-  }, [query, reloadKey])
+  }, [query, reloadKey, navigate])
 
+  // built from the current URL rather than the last render, so a debounced search
+  // that fires late doesn't undo a filter picked in the meantime.
   // only non-default values go into the URL, so links stay short
   const updateParams = useCallback(
-    (changes) => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
-        Object.entries(changes).forEach(([key, value]) => {
-          const isDefault = key === 'page' ? value === 1 : value === DEFAULTS[key]
-          if (isDefault || value === '') next.delete(key)
-          else next.set(key, value)
-        })
-        return next
+    (changes, options) => {
+      const next = new URLSearchParams(window.location.search)
+      Object.entries(changes).forEach(([key, value]) => {
+        const isDefault = key === 'page' ? value === 1 : value === DEFAULTS[key]
+        if (isDefault || value === '') next.delete(key)
+        else next.set(key, value)
       })
+      setSearchParams(next, options)
     },
     [setSearchParams]
   )
 
-  const changeFilter = (key, value) => updateParams({ [key]: value, page: 1 })
+  const changeFilters = (changes, options) => updateParams({ ...changes, page: 1 }, options)
+  const resetFilters = () => setSearchParams({})
 
   const changePage = (p) => {
     updateParams({ page: p })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const reload = () => setReloadKey((k) => k + 1)
+
   const confirmDelete = async () => {
     setDeleting(true)
     try {
       await api.delete(`/jobs/${toDelete._id}`)
       toast.success('Job deleted')
-      // if that was the last job on this page, step back one page
-      if (data.jobs.length === 1 && page > 1) updateParams({ page: page - 1 })
-      else setReloadKey((k) => k + 1)
+      reload()
+      // the card that had focus is gone, move focus somewhere sensible
+      countRef.current?.focus()
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -99,13 +119,22 @@ function AllJobs() {
         </Link>
       </PageHeader>
 
-      <JobsFilters values={filters} onChange={changeFilter} onReset={() => setSearchParams({})} />
+      <JobsFilters values={filters} onChange={changeFilters} onReset={resetFilters} />
 
-      <p className={styles.count} aria-live="polite">
-        {loading ? 'Loading…' : `${data.totalJobs} ${data.totalJobs === 1 ? 'job' : 'jobs'} found`}
-      </p>
+      {!isFiltered && page === 1 && <FollowUps reloadKey={reloadKey} onChange={reload} />}
 
-      {error && <p className={styles.error}>{error}</p>}
+      {error ? (
+        <div className={styles.error} role="alert">
+          <span>{error}</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      ) : (
+        <p className={styles.count} aria-live="polite" ref={countRef} tabIndex={-1}>
+          {loading ? 'Loading…' : `${data.totalJobs} ${data.totalJobs === 1 ? 'job' : 'jobs'} found`}
+        </p>
+      )}
 
       {loading ? (
         <div className={styles.grid}>
@@ -119,7 +148,7 @@ function AllJobs() {
             <>
               <h2>Nothing matches these filters</h2>
               <p>Try a different search or clear the filters.</p>
-              <button type="button" className="btn btn-ghost" onClick={() => setSearchParams({})}>
+              <button type="button" className="btn btn-ghost" onClick={resetFilters}>
                 Clear filters
               </button>
             </>

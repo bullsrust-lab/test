@@ -44,7 +44,6 @@
 }
 
 .counter {
-  display: none;
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -52,9 +51,5 @@
 @media (max-width: 560px) {
   .pages {
     display: none;
-  }
-
-  .counter {
-    display: inline;
   }
 }

@@ -19,7 +19,7 @@ function Pagination({ page, numOfPages, onChange }) {
   if (numOfPages <= 1) return null
 
   return (
-    <nav className={styles.pagination} aria-label="Pagination">
+    <nav className={styles.pagination} aria-label={`Pagination, page ${page} of ${numOfPages}`}>
       <button
         type="button"
         className="btn btn-ghost btn-sm"

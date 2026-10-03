@@ -1,12 +1,17 @@
 .count {
   margin: 22px 0 12px;
+  outline: none;
   font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
 }
 
 .error {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 22px 0 12px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   background: var(--danger-soft);

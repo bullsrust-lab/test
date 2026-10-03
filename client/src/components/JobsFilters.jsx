@@ -10,10 +10,11 @@ function JobsFilters({ values, onChange, onReset }) {
   const [prevSearch, setPrevSearch] = useState(values.search)
   const timer = useRef()
 
-  // the URL value can change from outside (Reset, back button), keep the input in sync
+  // the URL value can change from outside (Reset, back button), keep the input in sync.
+  // our own debounced update comes back trimmed, that one must not eat a space you just typed
   if (values.search !== prevSearch) {
     setPrevSearch(values.search)
-    setSearch(values.search)
+    if (values.search !== search.trim()) setSearch(values.search)
   }
 
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -22,10 +23,15 @@ function JobsFilters({ values, onChange, onReset }) {
     const { value } = e.target
     setSearch(value)
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => onChange('search', value.trim()), 400)
+    // replace, so every pause while typing doesn't become its own history entry
+    timer.current = setTimeout(() => onChange({ search: value.trim() }, { replace: true }), 400)
   }
 
-  const select = (e) => onChange(e.target.name, e.target.value)
+  // a select also sends whatever is typed in the search box right now
+  const select = (e) => {
+    clearTimeout(timer.current)
+    onChange({ [e.target.name]: e.target.value, search: search.trim() })
+  }
 
   return (
     <form className={styles.filters} role="search" onSubmit={(e) => e.preventDefault()}>
