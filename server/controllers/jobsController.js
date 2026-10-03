@@ -2,9 +2,10 @@ import { StatusCodes } from 'http-status-codes'
 import mongoose from 'mongoose'
 import dayjs from 'dayjs'
 import Job from '../models/Job.js'
-import { NotFoundError } from '../errors/index.js'
+import { BadRequestError, NotFoundError } from '../errors/index.js'
 import checkPermission from '../utils/checkPermission.js'
 import buildJobQuery from '../utils/buildJobQuery.js'
+import { DAY, FOLLOW_UP_AFTER, GHOSTED_AFTER } from '../utils/followUp.js'
 
 const EDITABLE_FIELDS = ['company', 'position', 'status', 'jobType', 'jobLocation']
 
@@ -19,6 +20,9 @@ const findOwnJob = async (req) => {
   checkPermission(req.user, job.createdBy)
   return job
 }
+
+// month buckets and the "6 months ago" window must use the same timezone
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 export const getAllJobs = async (req, res) => {
   const { filter, sort, skip, limit } = buildJobQuery(req.user.userId, req.query)
@@ -79,7 +83,10 @@ export const showStats = async (req, res) => {
     { $match: { createdBy: userId, createdAt: { $gte: from.toDate() } } },
     {
       $group: {
-        _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+        _id: {
+          year: { $year: { date: '$createdAt', timezone: TZ } },
+          month: { $month: { date: '$createdAt', timezone: TZ } },
+        },
         count: { $sum: 1 },
       },
     },
@@ -92,5 +99,65 @@ export const showStats = async (req, res) => {
     return { date: month.format('MMM YYYY'), count: found?.count ?? 0 }
   })
 
-  res.status(StatusCodes.OK).json({ defaultStats, monthlyApplications })
+  // median is done in JS so it doesn't depend on $median (MongoDB 7+)
+  const replied = await Job.find({ createdBy: userId, repliedAt: { $exists: true } })
+    .select('createdAt repliedAt')
+    .lean()
+  const days = replied
+    .map((job) => (job.repliedAt - job.createdAt) / DAY)
+    .filter((d) => d >= 0)
+    .sort((a, b) => a - b)
+  const mid = Math.floor(days.length / 2)
+  const replyTime = days.length
+    ? {
+        medianDays: Math.round(days.length % 2 ? days[mid] : (days[mid - 1] + days[mid]) / 2),
+        replies: days.length,
+      }
+    : null
+
+  res.status(StatusCodes.OK).json({ defaultStats, monthlyApplications, replyTime })
+}
+
+// "quiet since" = the latest of: applied, status changed, followed up.
+// due: pending/interview quiet for 10-30 days. ghosted: pending quiet for 30+ days.
+export const getFollowUps = async (req, res) => {
+  const userId = new mongoose.Types.ObjectId(req.user.userId)
+  const now = Date.now()
+  const dueFrom = new Date(now - FOLLOW_UP_AFTER * DAY)
+  const ghostFrom = new Date(now - GHOSTED_AFTER * DAY)
+
+  const [result] = await Job.aggregate([
+    // quietSince is never earlier than createdAt, so this cheap pre-filter can use the index
+    { $match: { createdBy: userId, status: { $in: ['pending', 'interview'] }, createdAt: { $lte: dueFrom } } },
+    { $addFields: { quietSince: { $max: ['$createdAt', '$statusChangedAt', '$followedUpAt'] } } },
+    { $match: { quietSince: { $lte: dueFrom } } },
+    {
+      $facet: {
+        due: [
+          { $match: { quietSince: { $gt: ghostFrom } } },
+          { $sort: { quietSince: 1, _id: 1 } },
+          { $limit: 20 },
+          { $project: { position: 1, company: 1, status: 1, createdAt: 1, quietSince: 1 } },
+        ],
+        dueCount: [{ $match: { quietSince: { $gt: ghostFrom } } }, { $count: 'n' }],
+        ghostedCount: [{ $match: { status: 'pending', quietSince: { $lte: ghostFrom } } }, { $count: 'n' }],
+      },
+    },
+  ])
+
+  res.status(StatusCodes.OK).json({
+    jobs: result.due,
+    dueCount: result.dueCount[0]?.n ?? 0,
+    ghostedCount: result.ghostedCount[0]?.n ?? 0,
+  })
+}
+
+export const markFollowedUp = async (req, res) => {
+  const job = await findOwnJob(req)
+  if (job.status === 'declined') throw new BadRequestError('This application is already closed')
+
+  job.followedUpAt = new Date()
+  await job.save()
+
+  res.status(StatusCodes.OK).json({ job })
 }

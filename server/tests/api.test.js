@@ -286,6 +286,166 @@ describe('users and demo', () => {
   })
 })
 
+describe('validation edge cases', () => {
+  it('returns 400, not 500, for non-string credentials', async () => {
+    await register({ password: 'secret123' })
+    const login = (body) => request(app).post('/api/v1/auth/login').send(body)
+
+    expect((await login({ email: 'anna@test.com', password: 123456 })).status).toBe(400)
+    expect((await login({ email: 'anna@test.com', password: ['a'] })).status).toBe(400)
+    expect((await login({ email: ['anna@test.com'], password: 'secret123' })).status).toBe(400)
+    expect((await register({ email: ['x@test.com'] })).status).toBe(400)
+    expect((await register({ email: 'num@test.com', password: 1234567 })).status).toBe(400)
+  })
+
+  it('rejects passwords longer than bcrypt can handle', async () => {
+    const res = await register({ password: 'й'.repeat(40) })
+    expect(res.status).toBe(400)
+  })
+
+  it('says "is required" for missing job fields', async () => {
+    const token = await tokenFor()
+    const res = await request(app).post('/api/v1/jobs').set('Authorization', `Bearer ${token}`).send({})
+    expect(res.status).toBe(400)
+    expect(res.body.msg).toBe('Company is required, Position is required, Location is required')
+  })
+
+  it('rejects arrays in enum fields', async () => {
+    const token = await tokenFor()
+    const res = await request(app)
+      .post('/api/v1/jobs')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...newJob, status: ['interview'] })
+    expect(res.status).toBe(400)
+    expect(res.body.msg).toBe('Invalid status')
+  })
+
+  it('treats a token of a deleted user as an invalid session', async () => {
+    const { body } = await register()
+    await User.deleteMany()
+    const res = await request(app).get('/api/v1/users/me').set('Authorization', `Bearer ${body.token}`)
+    expect(res.status).toBe(401)
+  })
+})
+
+const daysAgo = (n) => new Date(Date.now() - n * 864e5)
+
+describe('follow-ups', () => {
+  let auth
+  let userId
+
+  beforeEach(async () => {
+    const token = await tokenFor()
+    auth = { Authorization: `Bearer ${token}` }
+    userId = (await User.findOne({ email: 'anna@test.com' }))._id
+  })
+
+  const add = (position, status, fields = {}) =>
+    Job.create({ ...newJob, position, status, createdBy: userId, ...fields })
+
+  it('lists jobs that went quiet and counts the ghosted ones', async () => {
+    await add('A', 'pending', { createdAt: daysAgo(3) })
+    await add('B', 'pending', { createdAt: daysAgo(15) })
+    await add('C', 'pending', { createdAt: daysAgo(40) })
+    await add('D', 'interview', { createdAt: daysAgo(50), statusChangedAt: daysAgo(12) })
+    await add('E', 'interview', { createdAt: daysAgo(20), statusChangedAt: daysAgo(2) })
+    await add('F', 'declined', { createdAt: daysAgo(20) })
+    await add('G', 'pending', { createdAt: daysAgo(15), followedUpAt: daysAgo(2) })
+    const other = await User.create({ name: 'Bob', email: 'bob@test.com', password: 'secret123' })
+    await Job.create({ ...newJob, position: 'H', createdBy: other._id, createdAt: daysAgo(15) })
+
+    const res = await request(app).get('/api/v1/jobs/follow-ups').set(auth)
+    expect(res.status).toBe(200)
+    expect(res.body.jobs.map((j) => j.position)).toEqual(['B', 'D'])
+    expect(res.body.dueCount).toBe(2)
+    expect(res.body.ghostedCount).toBe(1)
+  })
+
+  it('records when a job first got a reply', async () => {
+    const { body } = await request(app).post('/api/v1/jobs').set(auth).send(newJob)
+    const url = `/api/v1/jobs/${body.job._id}`
+    expect(body.job.statusChangedAt).toBeUndefined()
+
+    const renamed = await request(app).patch(url).set(auth).send({ company: 'Other' })
+    expect(renamed.body.job.statusChangedAt).toBeUndefined()
+
+    const interview = await request(app).patch(url).set(auth).send({ status: 'interview' })
+    expect(interview.body.job.repliedAt).toBeTruthy()
+    const repliedAt = interview.body.job.repliedAt
+
+    const declined = await request(app).patch(url).set(auth).send({ status: 'declined' })
+    expect(declined.body.job.repliedAt).toBe(repliedAt)
+    expect(declined.body.job.statusChangedAt).toBeTruthy()
+  })
+
+  it('ignores tracking dates sent by the client', async () => {
+    const fake = { followedUpAt: daysAgo(1), repliedAt: daysAgo(1), statusChangedAt: daysAgo(1) }
+    const { body } = await request(app).post('/api/v1/jobs').set(auth).send({ ...newJob, ...fake })
+    expect(body.job.followedUpAt).toBeUndefined()
+    expect(body.job.repliedAt).toBeUndefined()
+
+    const patched = await request(app).patch(`/api/v1/jobs/${body.job._id}`).set(auth).send(fake)
+    expect(patched.body.job.followedUpAt).toBeUndefined()
+  })
+
+  it('marks a job as followed up', async () => {
+    const job = await add('B', 'pending', { createdAt: daysAgo(15) })
+    const res = await request(app).post(`/api/v1/jobs/${job._id}/follow-up`).set(auth)
+    expect(res.status).toBe(200)
+    expect(res.body.job.followedUpAt).toBeTruthy()
+
+    const list = await request(app).get('/api/v1/jobs/follow-ups').set(auth)
+    expect(list.body.dueCount).toBe(0)
+  })
+
+  it('checks ownership, ids and status on follow-up', async () => {
+    const declined = await add('F', 'declined', { createdAt: daysAgo(15) })
+    const other = await User.create({ name: 'Bob', email: 'bob@test.com', password: 'secret123' })
+    const foreign = await Job.create({ ...newJob, createdBy: other._id })
+    const post = (id) => request(app).post(`/api/v1/jobs/${id}/follow-up`).set(auth)
+
+    expect((await post(foreign._id)).status).toBe(403)
+    expect((await post('nope')).status).toBe(400)
+    expect((await post(new mongoose.Types.ObjectId())).status).toBe(404)
+    expect((await post(declined._id)).status).toBe(400)
+    expect((await request(app).post(`/api/v1/jobs/${declined._id}/follow-up`)).status).toBe(401)
+  })
+
+  it('returns the median time to a reply', async () => {
+    const empty = await request(app).get('/api/v1/jobs/stats').set(auth)
+    expect(empty.body.replyTime).toBeNull()
+
+    await add('X', 'interview', { createdAt: daysAgo(20), repliedAt: daysAgo(14) })
+    await add('Y', 'declined', { createdAt: daysAgo(20), repliedAt: daysAgo(10) })
+    const res = await request(app).get('/api/v1/jobs/stats').set(auth)
+    expect(res.body.replyTime).toEqual({ medianDays: 8, replies: 2 })
+  })
+})
+
+describe('demo refresh', () => {
+  it('moves demo dates forward once per 12 hours and leaves other users alone', async () => {
+    const demo = await User.create({
+      name: 'Demo',
+      email: 'demo@test.com',
+      password: 'secret123',
+      role: 'demo',
+      demoRefreshedAt: daysAgo(20),
+    })
+    const job = await Job.create({ ...newJob, createdBy: demo._id, createdAt: daysAgo(25) })
+    const other = await User.create({ name: 'Bob', email: 'bob@test.com', password: 'secret123' })
+    const otherJob = await Job.create({ ...newJob, createdBy: other._id, createdAt: daysAgo(25) })
+
+    await request(app).post('/api/v1/auth/demo')
+    const ageInDays = async (id) => (Date.now() - (await Job.findById(id)).createdAt) / 864e5
+
+    expect(await ageInDays(job._id)).toBeCloseTo(5, 1)
+    expect(await ageInDays(otherJob._id)).toBeCloseTo(25, 1)
+
+    await request(app).post('/api/v1/auth/demo')
+    expect(await ageInDays(job._id)).toBeCloseTo(5, 1)
+  })
+})
+
 it('returns JSON 404 for unknown api routes', async () => {
   const res = await request(app).get('/api/v1/nope')
   expect(res.status).toBe(404)
