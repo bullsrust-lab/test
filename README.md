@@ -148,9 +148,11 @@ Status codes: 200, 201, 400 (validation, bad id), 401 (no/invalid token, wrong c
 
 ## Deploying to Render
 
-One Web Service serves both the API and the built React app, so there's no CORS setup.
+One Web Service serves both the API and the built React app, so there's no CORS setup. There's a `render.yaml` in the repo, so the easiest way is New → Blueprint and point it at the repo. Render generates `JWT_SECRET` itself and only asks for `MONGO_URI`.
 
-- Build command: `npm install && npm run build`
+Or set it up by hand:
+
+- Build command: `npm install --include=dev && npm run build` (dev deps are needed for the Vite build)
 - Start command: `npm start`
 - Health check path: `/api/v1/health`
 - Environment: the variables above with `NODE_ENV=production` (Render sets `PORT` itself)

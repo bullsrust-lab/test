@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: jobtrail
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: JWT_LIFETIME
+        value: 1d
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
