@@ -182,12 +182,18 @@ describe('members', () => {
     const recruiterId = members.find((m) => m.role === 'recruiter').membershipId
     await request(app).patch(`/api/v1/orgs/${org._id}/memberships/${recruiterId}`).set(bearer(owner.token)).send({ role: 'owner' })
 
-    // the second owner demotes the first while the first one leaves
+    // the second owner demotes the first and leaves at the same moment. Whichever lands first wins:
+    // demote first, then leaving as the last owner is a 409; leave first, then the demotion comes
+    // from someone who isn't a member any more, a 403. Never both.
     const results = await Promise.all([
       request(app).patch(`/api/v1/orgs/${org._id}/memberships/${ownerId}`).set(bearer(recruiter.token)).send({ role: 'viewer' }),
       request(app).delete(`/api/v1/orgs/${org._id}/memberships/me`).set(bearer(recruiter.token)),
     ])
-    expect(results.map((r) => r.status).sort()).toEqual([200, 409])
+    // [demote, leave]
+    expect([
+      [200, 409],
+      [403, 200],
+    ]).toContainEqual(results.map((r) => r.status))
     expect(await Membership.countDocuments({ organization: org._id, role: 'owner' })).toBe(1)
   })
 
