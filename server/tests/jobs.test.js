@@ -164,7 +164,7 @@ describe('GET /jobs query', () => {
 
   it('takes one value per filter, not a list', async () => {
     expect((await get('?status=pending&status=interview')).status).toBe(400)
-    expect((await get('?jobType=remote&jobType=internship')).status).toBe(400)
+    expect((await get('?jobType=remote&jobType=part-time')).status).toBe(400)
     expect((await get('?sort=a-z&sort=latest')).status).toBe(400)
   })
 })
