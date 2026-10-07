@@ -36,7 +36,8 @@ function AcceptInvite() {
   const toast = useToast()
 
   const [invite, setInvite] = useState(null)
-  // the link can't be used (404/410) vs. the preview just failed to load (network, 5xx)
+  // the link can't be used (malformed 400, unknown 404, used or expired 410) vs. the preview just
+  // failed to load (network, 5xx)
   const [problem, setProblem] = useState('')
   const [loadError, setLoadError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
@@ -58,7 +59,8 @@ function AcceptInvite() {
       .catch((err) => {
         if (controller.signal.aborted) return
         const status = err.response?.status
-        if (status === 404 || status === 410) setProblem(getErrorMessage(err))
+        // a link cut short by a chat app comes back as 400, retrying won't fix it either
+        if (status === 400 || status === 404 || status === 410) setProblem(getErrorMessage(err))
         else setLoadError(getErrorMessage(err))
       })
     return () => controller.abort()

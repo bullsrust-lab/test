@@ -147,6 +147,14 @@ describe('AcceptInvite', () => {
     expect(await screen.findByRole('button', { name: /create account and join/i })).toBeInTheDocument()
   })
 
+  it('treats a malformed link as dead too, retrying would not help', async () => {
+    mockGet(Promise.reject(httpError(400, 'This invitation link is not valid')))
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: /can't be used/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument()
+  })
+
   it('treats a failed load as temporary, not as a dead link', async () => {
     const user = userEvent.setup()
     mockGet(Promise.reject(httpError(503, 'Database is not available, try again in a moment')))
