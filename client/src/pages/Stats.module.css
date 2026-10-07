@@ -160,3 +160,53 @@
   margin-bottom: 8px;
   color: var(--text-muted);
 }
+
+.companies {
+  margin-top: 18px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.companies h2 {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.companies ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: company;
+}
+
+.companies li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  counter-increment: company;
+}
+
+.companies li + li {
+  border-top: 1px dashed var(--border);
+}
+
+.companies li::before {
+  content: counter(company);
+  width: 20px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.companies li span:first-child {
+  flex: 1;
+  font-weight: 500;
+}
+
+.companyCount {
+  font-size: 13px;
+  color: var(--text-muted);
+}
