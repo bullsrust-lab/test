@@ -44,18 +44,26 @@ function DashboardLayout() {
     setMenuOpen(false)
   }
 
+  // While the drawer is open the rest of the page is inert, and focus() on an inert element does
+  // nothing. So closing only asks for it, and the effect below moves focus once inert is gone.
+  const refocusMenuBtn = useRef(false)
+
   const closeMenu = () => {
+    refocusMenuBtn.current = true
     setMenuOpen(false)
-    menuBtnRef.current?.focus()
   }
 
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen) {
+      if (refocusMenuBtn.current) menuBtnRef.current?.focus()
+      refocusMenuBtn.current = false
+      return
+    }
     closeBtnRef.current?.focus()
     const onKey = (e) => {
       if (e.key === 'Escape') {
+        refocusMenuBtn.current = true
         setMenuOpen(false)
-        menuBtnRef.current?.focus()
       }
     }
     // the drawer only exists on small screens, don't leave the page inert after resizing
