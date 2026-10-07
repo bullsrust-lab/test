@@ -21,13 +21,13 @@ function AddJob() {
     <>
       <PageHeader
         title="Add job"
-        subtitle={active?.personal ? "Log an application you've just sent." : `Adds it to ${active?.name}, everyone in the team will see it.`}
+        subtitle={!active || active.personal ? "Log an application you've just sent." : `Adds it to ${active.name}, everyone in the team will see it.`}
       />
       {!canWrite && (
         <p className={styles.notice}>
           {isDemo
             ? 'The demo account is read-only.'
-            : `You're a viewer in ${active?.name}: you can see the pipeline, but not add to it.`}
+            : `You're a viewer in ${active?.name ?? 'this team'}: you can see the pipeline, but not add to it.`}
         </p>
       )}
       <JobForm submitLabel="Add job" onSubmit={createJob} disabled={!canWrite} />

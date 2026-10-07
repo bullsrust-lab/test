@@ -114,7 +114,7 @@ function AllJobs() {
     <>
       <PageHeader
         title="All jobs"
-        subtitle={active?.personal ? "Everything you've applied to, in one place." : `The shared pipeline of ${active?.name}.`}
+        subtitle={!active || active.personal ? "Everything you've applied to, in one place." : `The shared pipeline of ${active.name}.`}
       >
         {canWrite && (
           <Link to="/dashboard/add-job" className="btn btn-primary">

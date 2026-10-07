@@ -12,7 +12,7 @@ function EditJob() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { canWrite } = useOrg()
+  const { active, canWrite } = useOrg()
   const toast = useToast()
   const [job, setJob] = useState(null)
   const [error, setError] = useState('')
@@ -61,6 +61,11 @@ function EditJob() {
   return (
     <>
       <PageHeader title="Edit job" subtitle={`${position} at ${company}`} />
+      {!canWrite && (
+        <p className={styles.notice}>
+          {active?.personal ? 'The demo account is read-only.' : `Viewers in ${active?.name ?? 'this team'} can see jobs but not change them.`}
+        </p>
+      )}
       <JobForm
         initialValues={{ position, company, jobLocation, status, jobType }}
         submitLabel="Save changes"

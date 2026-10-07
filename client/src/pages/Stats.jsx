@@ -5,6 +5,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import PageHeader from '../components/PageHeader'
 import Spinner from '../components/Spinner'
 import api, { getErrorMessage } from '../api/client'
+import { useOrg } from '../context/OrgContext'
 import styles from './Stats.module.css'
 
 const tiles = [
@@ -24,6 +25,7 @@ function Stats() {
   const [error, setError] = useState('')
   const [chart, setChart] = useState('bar')
   const [reloadKey, setReloadKey] = useState(0)
+  const { canWrite } = useOrg()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -64,10 +66,12 @@ function Stats() {
         <PageHeader title="Stats" />
         <div className={styles.empty}>
           <h2>No applications yet</h2>
-          <p>Stats show up once you've added a few jobs.</p>
-          <Link to="/dashboard/add-job" className="btn btn-primary">
-            Add a job
-          </Link>
+          <p>Stats show up once a few jobs have been added.</p>
+          {canWrite && (
+            <Link to="/dashboard/add-job" className="btn btn-primary">
+              Add a job
+            </Link>
+          )}
         </div>
       </>
     )
