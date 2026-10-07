@@ -3,8 +3,10 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import Spinner from '../components/Spinner'
 import ThemeToggle from '../components/ThemeToggle'
-import { IconChart, IconClose, IconList, IconLogout, IconMenu, IconPlus, IconUser } from '../components/Icons'
+import OrgSwitcher from '../components/OrgSwitcher'
+import { IconChart, IconClose, IconList, IconLogout, IconMenu, IconPlus, IconUser, IconUsers } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
+import { useOrg } from '../context/OrgContext'
 import { setSessionFlag } from '../utils/storage'
 import styles from './DashboardLayout.module.css'
 
@@ -12,6 +14,7 @@ const links = [
   { to: 'all-jobs', label: 'All jobs', icon: IconList },
   { to: 'add-job', label: 'Add job', icon: IconPlus },
   { to: 'stats', label: 'Stats', icon: IconChart },
+  { to: 'team', label: 'Team', icon: IconUsers },
   { to: 'profile', label: 'Profile', icon: IconUser },
 ]
 
@@ -28,6 +31,7 @@ function DashboardLayout() {
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
   const { user, isDemo, logout } = useAuth()
+  const { active, canWrite, loading: orgsLoading, error: orgsError, reloadOrgs } = useOrg()
   const navigate = useNavigate()
   const menuBtnRef = useRef(null)
   const closeBtnRef = useRef(null)
@@ -40,18 +44,26 @@ function DashboardLayout() {
     setMenuOpen(false)
   }
 
+  // While the drawer is open the rest of the page is inert, and focus() on an inert element does
+  // nothing. So closing only asks for it, and the effect below moves focus once inert is gone.
+  const refocusMenuBtn = useRef(false)
+
   const closeMenu = () => {
+    refocusMenuBtn.current = true
     setMenuOpen(false)
-    menuBtnRef.current?.focus()
   }
 
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen) {
+      if (refocusMenuBtn.current) menuBtnRef.current?.focus()
+      refocusMenuBtn.current = false
+      return
+    }
     closeBtnRef.current?.focus()
     const onKey = (e) => {
       if (e.key === 'Escape') {
+        refocusMenuBtn.current = true
         setMenuOpen(false)
-        menuBtnRef.current?.focus()
       }
     }
     // the drawer only exists on small screens, don't leave the page inert after resizing
@@ -103,13 +115,18 @@ function DashboardLayout() {
           </button>
         </div>
 
+        <OrgSwitcher />
+
         <nav className={styles.nav} aria-label="Dashboard">
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
-              <Icon />
-              {label}
-            </NavLink>
-          ))}
+          {links
+            // viewers can't add jobs, so don't offer it
+            .filter((link) => link.to !== 'add-job' || canWrite)
+            .map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
+                <Icon />
+                {label}
+              </NavLink>
+            ))}
         </nav>
 
         <button type="button" className={`${styles.link} ${styles.logout}`} onClick={handleLogout}>
@@ -157,7 +174,18 @@ function DashboardLayout() {
 
         <main className={styles.content} ref={mainRef} tabIndex={-1}>
           <Suspense fallback={<Spinner />}>
-            <Outlet />
+            {orgsError && !active ? (
+              <div className={styles.orgError} role="alert">
+                <span>{orgsError}. Your jobs are safe, the page just couldn't load which workspaces you're in.</span>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={reloadOrgs}>
+                  Try again
+                </button>
+              </div>
+            ) : orgsLoading && !active ? (
+              <Spinner />
+            ) : (
+              <Outlet key={active?._id ?? 'none'} />
+            )}
           </Suspense>
         </main>
       </div>

@@ -78,3 +78,11 @@
     background-position: -200% 0;
   }
 }
+
+.notice {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--pending-bg);
+  font-size: 14px;
+}

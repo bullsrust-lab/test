@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import dayjs from 'dayjs'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import PageHeader from '../components/PageHeader'
 import Spinner from '../components/Spinner'
 import api, { getErrorMessage } from '../api/client'
+import { useOrg } from '../context/OrgContext'
 import styles from './Stats.module.css'
 
 const tiles = [
@@ -23,13 +25,17 @@ function Stats() {
   const [error, setError] = useState('')
   const [chart, setChart] = useState('bar')
   const [reloadKey, setReloadKey] = useState(0)
+  const { canWrite } = useOrg()
 
   useEffect(() => {
     const controller = new AbortController()
     setError('')
-    api
-      .get('/jobs/stats', { signal: controller.signal })
-      .then(({ data }) => setStats(data))
+    // the stats shape is fixed by the brief, the reply time comes from its own endpoint
+    Promise.all([
+      api.get('/stats', { signal: controller.signal }),
+      api.get('/stats/reply-time', { signal: controller.signal }),
+    ])
+      .then(([stats, reply]) => setStats({ ...stats.data, replyTime: reply.data.replyTime }))
       .catch((err) => {
         if (!controller.signal.aborted) setError(getErrorMessage(err))
       })
@@ -51,8 +57,8 @@ function Stats() {
   }
   if (!stats) return <Spinner />
 
-  const { defaultStats, monthlyApplications, replyTime } = stats
-  const total = Object.values(defaultStats).reduce((a, b) => a + b, 0)
+  const { countsByStatus, applicationsPerMonth, topCompanies, replyTime } = stats
+  const total = Object.values(countsByStatus).reduce((a, b) => a + b, 0)
 
   if (total === 0) {
     return (
@@ -60,16 +66,23 @@ function Stats() {
         <PageHeader title="Stats" />
         <div className={styles.empty}>
           <h2>No applications yet</h2>
-          <p>Stats show up once you've added a few jobs.</p>
-          <Link to="/dashboard/add-job" className="btn btn-primary">
-            Add a job
-          </Link>
+          <p>Stats show up once a few jobs have been added.</p>
+          {canWrite && (
+            <Link to="/dashboard/add-job" className="btn btn-primary">
+              Add a job
+            </Link>
+          )}
         </div>
       </>
     )
   }
 
-  const data = monthlyApplications.map((m) => ({ ...m, month: m.date.split(' ')[0] }))
+  // "2026-05" -> "May" on the axis, "May 2026" in the tooltip
+  const data = applicationsPerMonth.map((m) => ({
+    ...m,
+    label: dayjs(`${m.month}-01`).format('MMM'),
+    full: dayjs(`${m.month}-01`).format('MMMM YYYY'),
+  }))
   const Chart = chart === 'bar' ? BarChart : AreaChart
 
   return (
@@ -79,10 +92,10 @@ function Stats() {
       <div className={styles.tiles}>
         {tiles.map(({ key, label }) => (
           <div key={key} className={`${styles.tile} ${styles[key]}`}>
-            <span className={`mono ${styles.number}`}>{defaultStats[key]}</span>
+            <span className={`mono ${styles.number}`}>{countsByStatus[key]}</span>
             <span className={styles.label}>{label}</span>
             <span className={styles.share}>
-              {total ? Math.round((defaultStats[key] / total) * 100) : 0}% of all
+              {total ? Math.round((countsByStatus[key] / total) * 100) : 0}% of all
             </span>
           </div>
         ))}
@@ -122,11 +135,11 @@ function Stats() {
           <ResponsiveContainer width="100%" height="100%">
             <Chart data={data} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="month" {...axisProps} />
+              <XAxis dataKey="label" {...axisProps} />
               <YAxis allowDecimals={false} {...axisProps} />
               <Tooltip
                 cursor={{ fill: 'var(--surface-2)' }}
-                labelFormatter={(_, payload) => payload?.[0]?.payload.date}
+                labelFormatter={(_, payload) => payload?.[0]?.payload.full}
                 formatter={(value) => [value, 'Applications']}
                 contentStyle={{
                   background: 'var(--surface)',
@@ -151,6 +164,22 @@ function Stats() {
           </ResponsiveContainer>
         </div>
       </section>
+
+      {topCompanies.length > 0 && (
+        <section className={styles.companies}>
+          <h2>Most applied to</h2>
+          <ol>
+            {topCompanies.map(({ company, count }) => (
+              <li key={company}>
+                <span>{company}</span>
+                <span className={`mono ${styles.companyCount}`}>
+                  {count} {count === 1 ? 'application' : 'applications'}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
     </>
   )
 }

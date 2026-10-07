@@ -19,6 +19,16 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  // the API client cleared an expired session without leaving the page (invite links)
+  useEffect(() => {
+    const onExpired = () => {
+      setToken(null)
+      setUser(null)
+    }
+    window.addEventListener('auth:expired', onExpired)
+    return () => window.removeEventListener('auth:expired', onExpired)
+  }, [])
+
   // logging in or out in another tab changes the token under our feet, reload to pick it up
   useEffect(() => {
     const onStorage = (e) => {

@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "npm run build",
+  "regions": ["cdg1"],
+  "buildCommand": "npm run migrate && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" },

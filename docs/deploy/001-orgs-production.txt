@@ -1,0 +1,26 @@
+001-orgs on the live database (the MongoDB Atlas cluster behind jobtrail-two.vercel.app), 7 Oct 2026.
+Vercel runs `npm run migrate` before the client build, so these are excerpts from the two build logs.
+Preview and production deployments use the same database.
+
+First run: preview build of v2-teams @ fed08d9, 14:09 UTC
+
+  001-orgs
+    users processed                                  2
+    orgs created                                     2
+    jobs migrated                                    75
+    users already migrated (skipped)                 0
+    jobs whose author no longer exists (left as is)  0
+    took                                             908 ms
+
+Second run: the same commit built for production, 14:36 UTC. Nothing left to do.
+
+  001-orgs
+    users processed                                  0
+    orgs created                                     0
+    jobs migrated                                    0
+    users already migrated (skipped)                 2
+    jobs whose author no longer exists (left as is)  0
+    took                                             293 ms
+
+Production stayed on the v1 build until the second build was ready, then the alias switched.
+The migration only adds fields (organization, createdByName) and new collections, which v1 ignores.

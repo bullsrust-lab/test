@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs'
 import User from '../models/User.js'
 import { BadRequestError, NotFoundError, UnauthenticatedError } from '../errors/index.js'
 import refreshDemo from '../utils/refreshDemo.js'
+import { ensurePersonalOrg } from '../utils/orgs.js'
+import withTransaction from '../utils/transaction.js'
 
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10)
 
@@ -17,8 +19,13 @@ export const register = async (req, res) => {
     throw new BadRequestError('Email already in use')
   }
 
-  // role is never taken from the body, everyone who registers is a regular user
-  const user = await User.create({ name, email, password })
+  // role is never taken from the body, everyone who registers is a regular user.
+  // The account and its Personal workspace are created together, so v1-style solo use keeps working
+  const user = await withTransaction(async (session) => {
+    const [created] = await User.create([{ name, email, password }], { session })
+    await ensurePersonalOrg(created._id, { session })
+    return created
+  })
   sendUser(res, StatusCodes.CREATED, user)
 }
 

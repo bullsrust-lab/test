@@ -32,6 +32,14 @@ export const registerLimiter = limiter({
   message: { msg: 'Too many accounts created from this IP, try again later' },
 })
 
+// accepting an invitation without an account creates one, so it counts like a sign-up
+export const acceptLimiter = limiter({
+  windowMs: HOUR,
+  limit: 10,
+  skip: (req) => process.env.NODE_ENV === 'test' || Boolean(req.user),
+  message: { msg: 'Too many accounts created from this IP, try again later' },
+})
+
 // general limit for the whole API, per IP (not per user: the demo account is shared)
 export const apiLimiter = limiter({
   windowMs: FIFTEEN_MINUTES,

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Register from './pages/Register'
 import NotFound from './pages/NotFound'
+import AcceptInvite from './pages/AcceptInvite'
 import DashboardLayout from './layouts/DashboardLayout'
 import ProtectedRoute from './routes/ProtectedRoute'
 import Spinner from './components/Spinner'
@@ -13,6 +14,7 @@ const AddJob = lazy(() => import('./pages/AddJob'))
 const EditJob = lazy(() => import('./pages/EditJob'))
 const Stats = lazy(() => import('./pages/Stats'))
 const Profile = lazy(() => import('./pages/Profile'))
+const Team = lazy(() => import('./pages/Team'))
 
 function App() {
   return (
@@ -21,6 +23,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/invite/:token" element={<AcceptInvite />} />
           <Route
             path="/dashboard"
             element={
@@ -35,6 +38,7 @@ function App() {
             <Route path="edit-job/:id" element={<EditJob />} />
             <Route path="stats" element={<Stats />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="team" element={<Team />} />
             <Route path="*" element={<NotFound inDashboard />} />
           </Route>
           <Route path="*" element={<NotFound />} />

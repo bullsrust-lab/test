@@ -13,10 +13,10 @@ const toPositiveInt = (value, fallback, max = Infinity) => {
   return Math.min(n, max)
 }
 
-const buildJobQuery = (userId, query) => {
+const buildJobQuery = (organizationId, query) => {
   const { status, jobType, sort, search } = query
 
-  const filter = { createdBy: userId }
+  const filter = { organization: organizationId }
   if (status && status !== 'all') filter.status = status
   if (jobType && jobType !== 'all') filter.jobType = jobType
   if (search?.trim()) {

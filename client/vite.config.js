@@ -11,8 +11,14 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
-        '/api': `http://localhost:${env.PORT || 5000}`,
+        // keep the browser's Host header: the API builds invite links from it,
+        // and they must point at this dev server, not at the API port
+        '/api': { target: `http://localhost:${env.PORT || 5000}`, changeOrigin: false },
       },
+    },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.js',
     },
   }
 })

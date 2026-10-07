@@ -8,7 +8,7 @@ import PageHeader from '../components/PageHeader'
 import Pagination from '../components/Pagination'
 import { IconPlus } from '../components/Icons'
 import api, { getErrorMessage } from '../api/client'
-import { useAuth } from '../context/AuthContext'
+import { useOrg } from '../context/OrgContext'
 import { useToast } from '../context/ToastContext'
 import { PAGE_SIZE } from '../utils/constants'
 import styles from './AllJobs.module.css'
@@ -26,7 +26,7 @@ function AllJobs() {
   const [deleting, setDeleting] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const countRef = useRef(null)
-  const { isDemo } = useAuth()
+  const { active, canWrite } = useOrg()
   const toast = useToast()
 
   const filters = Object.fromEntries(
@@ -112,11 +112,16 @@ function AllJobs() {
 
   return (
     <>
-      <PageHeader title="All jobs" subtitle="Everything you've applied to, in one place.">
-        <Link to="/dashboard/add-job" className="btn btn-primary">
-          <IconPlus size={16} />
-          Add job
-        </Link>
+      <PageHeader
+        title="All jobs"
+        subtitle={!active || active.personal ? "Everything you've applied to, in one place." : `The shared pipeline of ${active.name}.`}
+      >
+        {canWrite && (
+          <Link to="/dashboard/add-job" className="btn btn-primary">
+            <IconPlus size={16} />
+            Add job
+          </Link>
+        )}
       </PageHeader>
 
       <JobsFilters values={filters} onChange={changeFilters} onReset={resetFilters} />
@@ -169,7 +174,8 @@ function AllJobs() {
               key={job._id}
               job={job}
               onDelete={setToDelete}
-              readOnly={isDemo}
+              readOnly={!canWrite}
+              showAuthor={!active?.personal}
               editSearch={query ? `?${query}` : ''}
             />
           ))}

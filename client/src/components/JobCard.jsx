@@ -3,10 +3,10 @@ import dayjs from 'dayjs'
 import StatusBadge from './StatusBadge'
 import { capitalize } from '../utils/constants'
 import { followUpState } from '../utils/followUp'
-import { IconBriefcase, IconCalendar, IconClock, IconEdit, IconPin, IconTrash } from './Icons'
+import { IconBriefcase, IconCalendar, IconClock, IconEdit, IconPin, IconTrash, IconUser } from './Icons'
 import styles from './JobCard.module.css'
 
-function JobCard({ job, onDelete, readOnly, editSearch }) {
+function JobCard({ job, onDelete, readOnly, editSearch, showAuthor }) {
   const { _id, position, company, jobLocation, jobType, status, createdAt } = job
   const quiet = followUpState(job)
   const label = (
@@ -44,6 +44,12 @@ function JobCard({ job, onDelete, readOnly, editSearch }) {
             {dayjs(createdAt).format('MMM D, YYYY')}
           </time>
         </li>
+        {showAuthor && job.createdByName && (
+          <li>
+            <IconUser size={15} />
+            {job.createdByName}
+          </li>
+        )}
         {quiet && (
           <li className={styles.quiet}>
             <IconClock size={15} />
