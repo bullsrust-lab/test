@@ -14,5 +14,9 @@ export default defineConfig(({ mode }) => {
         '/api': `http://localhost:${env.PORT || 5000}`,
       },
     },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.js',
+    },
   }
 })
