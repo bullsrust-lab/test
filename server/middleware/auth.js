@@ -2,11 +2,8 @@ import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
 import { UnauthenticatedError } from '../errors/index.js'
 
-const auth = (req, res, next) => {
-  const header = req.headers.authorization
-  if (!header || !header.startsWith('Bearer ')) {
-    throw new UnauthenticatedError()
-  }
+const readUser = (header) => {
+  if (!header || !header.startsWith('Bearer ')) throw new UnauthenticatedError()
 
   let payload
   try {
@@ -21,7 +18,18 @@ const auth = (req, res, next) => {
     throw new UnauthenticatedError()
   }
 
-  req.user = { userId, name, role }
+  return { userId, name, role }
+}
+
+const auth = (req, res, next) => {
+  req.user = readUser(req.headers.authorization)
+  next()
+}
+
+// for routes that work both signed in and anonymously (accepting an invitation).
+// A token that is sent but invalid is still a 401, it's not silently treated as "anonymous"
+export const optionalAuth = (req, res, next) => {
+  if (req.headers.authorization) req.user = readUser(req.headers.authorization)
   next()
 }
 
