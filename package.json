@@ -12,8 +12,12 @@
     "build": "npm run build -w client",
     "start": "npm start -w server",
     "seed": "npm run seed -w server",
-    "test": "npm test -w server",
-    "lint": "oxlint -c .oxlintrc.json --deny-warnings client/src server api"
+    "test": "npm test -w server --",
+    "lint": "oxlint -c .oxlintrc.json --deny-warnings client/src server api",
+    "test:client": "npm test -w client",
+    "migrate": "npm run migrate -w server",
+    "seed:team": "npm run seed:team -w server --",
+    "bench:stats": "npm run bench:stats -w server"
   },
   "devDependencies": {
     "concurrently": "^9.2.4",

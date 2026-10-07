@@ -5,6 +5,7 @@ import User from '../models/User.js'
 import Job from '../models/Job.js'
 import { JOB_TYPE } from '../models/Job.js'
 import { DAY } from '../utils/followUp.js'
+import { ensurePersonalOrg } from '../utils/orgs.js'
 
 const positions = [
   'Junior Frontend Developer',
@@ -71,7 +72,7 @@ const ages = [
   ...Array.from({ length: 55 }, () => between(31, 240)),
 ]
 
-const buildJob = (age, createdBy, now) => {
+const buildJob = (age, demo, organization, now) => {
   const createdAt = new Date(now - age * DAY)
   const status = statusFor(age)
   const job = {
@@ -80,7 +81,9 @@ const buildJob = (age, createdBy, now) => {
     jobLocation: pick(locations),
     jobType: pick(JOB_TYPE),
     status,
-    createdBy,
+    organization,
+    createdBy: demo._id,
+    createdByName: demo.name,
     createdAt,
     updatedAt: createdAt,
   }
@@ -119,10 +122,11 @@ const run = async () => {
     demo = await User.create({ name: 'Demo User', email, password, role: 'demo' })
   }
 
+  const { organization } = await ensurePersonalOrg(demo._id)
   await Job.deleteMany({ createdBy: demo._id })
 
   const now = Date.now()
-  const jobs = ages.map((age) => buildJob(age, demo._id, now))
+  const jobs = ages.map((age) => buildJob(age, demo, organization._id, now))
 
   // insertMany with timestamps off keeps our createdAt instead of overwriting it with "now"
   await Job.insertMany(jobs, { timestamps: false })
