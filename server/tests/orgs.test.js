@@ -12,6 +12,7 @@ import {
   teamWithRoles,
   useDatabase,
 } from './helpers.js'
+import Job from '../models/Job.js'
 import Membership from '../models/Membership.js'
 import Organization from '../models/Organization.js'
 import User from '../models/User.js'
@@ -47,6 +48,17 @@ describe('organizations', () => {
     expect((await post('ab')).status).toBe(400)
     expect((await post('x'.repeat(81))).status).toBe(400)
     expect((await post(42)).status).toBe(400)
+    expect((await post('personal')).status).toBe(400)
+  })
+
+  it("never lets a team take a Personal workspace's slug", async () => {
+    const victim = await User.create({ name: 'Late', email: 'late@test.com', password: PASSWORD })
+    const attacker = await register()
+    const team = await createTeam(attacker.token, `personal-${victim._id}`)
+    expect(team.slug).toBe(`team-personal-${victim._id}`)
+
+    // the victim's workspace can still be created on their first request
+    expect((await request(app).get('/api/v1/jobs').set(bearer(victim.createJWT()))).status).toBe(200)
   })
 })
 
@@ -75,11 +87,29 @@ describe('active organization (X-Org-Id)', () => {
     expect((await request(app).get('/api/v1/jobs').set(bearer(token, new mongoose.Types.ObjectId()))).status).toBe(403)
   })
 
-  it('creates the Personal workspace on the fly for a user that has none (pre-v2 account)', async () => {
+  it('creates the Personal workspace on the fly for a pre-v2 account, with its jobs', async () => {
     const legacy = await User.create({ name: 'Legacy', email: 'legacy@test.com', password: PASSWORD })
+    await Job.collection.insertOne({ ...newJob, status: 'pending', jobType: 'full-time', createdBy: legacy._id, createdAt: new Date() })
+
     const res = await request(app).get('/api/v1/jobs').set(bearer(legacy.createJWT()))
     expect(res.status).toBe(200)
+    expect(res.body.totalJobs).toBe(1)
     expect(await personalOrgOf(legacy._id)).not.toBeNull()
+  })
+
+  it('picks up jobs the old version wrote after the migration when the org list loads', async () => {
+    const { token, user } = await register()
+    await Job.collection.insertOne({ ...newJob, status: 'pending', jobType: 'full-time', createdBy: new mongoose.Types.ObjectId(user._id), createdAt: new Date() })
+
+    await request(app).get('/api/v1/orgs').set(bearer(token))
+    expect((await request(app).get('/api/v1/jobs').set(bearer(token))).body.totalJobs).toBe(1)
+  })
+
+  it('does not write anything on a plain read in the Personal workspace', async () => {
+    const { token, user } = await register()
+    const before = (await personalOrgOf(user._id)).updatedAt
+    await request(app).get('/api/v1/jobs').set(bearer(token))
+    expect((await personalOrgOf(user._id)).updatedAt).toEqual(before)
   })
 
   it('shows who added each job in a shared list', async () => {
@@ -127,6 +157,50 @@ describe('members', () => {
     expect(promoted.status).toBe(200)
     // with two owners, the first one may step down
     expect((await patch(owner.token, id('owner'), 'recruiter')).status).toBe(200)
+  })
+
+  it('lets an owner remove a member, who then loses access', async () => {
+    const { owner, viewer, recruiter, org } = await teamWithRoles()
+    const members = (await request(app).get(`/api/v1/orgs/${org._id}`).set(bearer(owner.token))).body.members
+    const id = (role) => members.find((m) => m.role === role).membershipId
+    const remove = (token, membershipId) =>
+      request(app).delete(`/api/v1/orgs/${org._id}/memberships/${membershipId}`).set(bearer(token))
+
+    expect((await remove(recruiter.token, id('viewer'))).status).toBe(403)
+    expect((await remove(owner.token, id('owner'))).status).toBe(400)
+    expect((await remove(owner.token, id('viewer'))).status).toBe(200)
+
+    const after = await request(app).get('/api/v1/jobs').set(bearer(viewer.token, org._id))
+    expect(after.status).toBe(403)
+    expect(after.body.code).toBe('NOT_A_MEMBER')
+  })
+
+  it('never ends up without an owner, even when two owners act at the same time', async () => {
+    const { owner, recruiter, org } = await teamWithRoles()
+    const members = (await request(app).get(`/api/v1/orgs/${org._id}`).set(bearer(owner.token))).body.members
+    const ownerId = members.find((m) => m.role === 'owner').membershipId
+    const recruiterId = members.find((m) => m.role === 'recruiter').membershipId
+    await request(app).patch(`/api/v1/orgs/${org._id}/memberships/${recruiterId}`).set(bearer(owner.token)).send({ role: 'owner' })
+
+    // the second owner demotes the first while the first one leaves
+    const results = await Promise.all([
+      request(app).patch(`/api/v1/orgs/${org._id}/memberships/${ownerId}`).set(bearer(recruiter.token)).send({ role: 'viewer' }),
+      request(app).delete(`/api/v1/orgs/${org._id}/memberships/me`).set(bearer(recruiter.token)),
+    ])
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409])
+    expect(await Membership.countDocuments({ organization: org._id, role: 'owner' })).toBe(1)
+  })
+
+  it('deletes a team when its only member leaves', async () => {
+    const { token } = await register()
+    const team = await createTeam(token, 'Solo Team')
+    await request(app).post('/api/v1/jobs').set(bearer(token, team._id)).send(newJob)
+
+    const res = await request(app).delete(`/api/v1/orgs/${team._id}/memberships/me`).set(bearer(token))
+    expect(res.status).toBe(200)
+    expect(res.body.msg).toMatch(/deleted/)
+    expect(await Organization.exists({ _id: team._id })).toBeNull()
+    expect(await Job.countDocuments({ organization: team._id })).toBe(0)
   })
 
   it('handles leaving: not your Personal workspace, not as the last owner', async () => {

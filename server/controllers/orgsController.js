@@ -1,10 +1,13 @@
 import { StatusCodes } from 'http-status-codes'
+import Organization from '../models/Organization.js'
 import Membership from '../models/Membership.js'
 import Invitation, { INVITE_TTL_DAYS } from '../models/Invitation.js'
+import Job from '../models/Job.js'
 import User from '../models/User.js'
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../errors/index.js'
-import { createOrganization, ensurePersonalOrg } from '../utils/orgs.js'
+import { adoptOrphanJobs, createOrganization, ensurePersonalOrg } from '../utils/orgs.js'
 import { DAY } from '../utils/followUp.js'
+import withTransaction from '../utils/transaction.js'
 
 // the membership of the signed-in user in :orgId, or 403 (same answer for "no such org")
 const membershipIn = async (req) => {
@@ -19,14 +22,47 @@ const requireOwner = (membership) => {
   if (membership.role !== 'owner') throw new ForbiddenError('Only an owner can do this')
 }
 
-const countOwners = (organizationId) => Membership.countDocuments({ organization: organizationId, role: 'owner' })
+const countOwners = (organizationId, session) =>
+  Membership.countDocuments({ organization: organizationId, role: 'owner' }).session(session)
+
+// Every change that can remove an owner runs in a transaction that first writes the org document.
+// Two such changes at the same time then conflict, and the retried one sees the other's result
+// (snapshot isolation alone would let both read "2 owners" and both remove one).
+// fn gets the session and the caller's membership as it is inside the transaction.
+const ownerChange = (organizationId, userId, fn) =>
+  withTransaction(async (session) => {
+    await Organization.updateOne(
+      { _id: organizationId },
+      { $set: { updatedAt: new Date() } },
+      { session, timestamps: false }
+    )
+    const me = await Membership.findOne({ user: userId, organization: organizationId }).session(session)
+    return fn(session, me)
+  })
+
+// invitations an owner sent stop working once they're no longer an owner (demoted, removed, left)
+const revokeInvitesFrom = (organizationId, userId, session) =>
+  Invitation.updateMany(
+    { organization: organizationId, invitedBy: userId, status: 'pending' },
+    { $set: { status: 'revoked' } },
+    { session }
+  )
+
+const LAST_OWNER = 'An organization needs at least one owner. Make someone else an owner first.'
 
 // where the invitee should land. APP_URL wins when the API and the site live on different hosts
 const appUrl = (req) => process.env.APP_URL || `${req.protocol}://${req.get('host')}`
 
 export const listMyOrgs = async (req, res) => {
-  await ensurePersonalOrg(req.user.userId)
-  const memberships = await Membership.find({ user: req.user.userId }).populate('organization').lean()
+  let memberships = await Membership.find({ user: req.user.userId }).populate('organization').lean()
+  let personal = memberships.find((m) => m.organization?.personalOf)
+  if (!personal) {
+    await ensurePersonalOrg(req.user.userId)
+    memberships = await Membership.find({ user: req.user.userId }).populate('organization').lean()
+    personal = memberships.find((m) => m.organization?.personalOf)
+  }
+  // jobs the old version created during the deploy window (see ADR-002); almost always a no-op
+  if (personal) await adoptOrphanJobs(req.user.userId, personal.organization._id)
 
   const organizations = memberships
     .filter((m) => m.organization)
@@ -144,31 +180,80 @@ export const revokeInvitation = async (req, res) => {
 export const updateMemberRole = async (req, res) => {
   const membership = await membershipIn(req)
   requireOwner(membership)
-
-  const target = await Membership.findOne({ _id: req.params.membershipId, organization: membership.organization._id })
-  if (!target) throw new NotFoundError('No member with this id in this organization')
-
+  const orgId = membership.organization._id
   const { role } = req.body
-  if (target.role === 'owner' && role !== 'owner' && (await countOwners(target.organization)) === 1) {
-    throw new ConflictError('An organization needs at least one owner. Make someone else an owner first.')
-  }
 
-  target.role = role
-  await target.save()
+  const target = await ownerChange(orgId, req.user.userId, async (session, me) => {
+    if (me?.role !== 'owner') throw new ForbiddenError('Only an owner can do this')
+    const member = await Membership.findOne({ _id: req.params.membershipId, organization: orgId }).session(session)
+    if (!member) throw new NotFoundError('No member with this id in this organization')
+
+    const demotesOwner = member.role === 'owner' && role !== 'owner'
+    if (demotesOwner && (await countOwners(orgId, session)) === 1) throw new ConflictError(LAST_OWNER)
+
+    member.role = role
+    await member.save({ session })
+    if (demotesOwner) await revokeInvitesFrom(orgId, member.user, session)
+    return member
+  })
+
   res.status(StatusCodes.OK).json({ membership: target })
 }
 
+export const removeMember = async (req, res) => {
+  const membership = await membershipIn(req)
+  requireOwner(membership)
+  const { organization } = membership
+  if (organization.personalOf) throw new BadRequestError('A Personal workspace has no other members')
+
+  await ownerChange(organization._id, req.user.userId, async (session, me) => {
+    if (me?.role !== 'owner') throw new ForbiddenError('Only an owner can do this')
+    const member = await Membership.findOne({ _id: req.params.membershipId, organization: organization._id }).session(
+      session
+    )
+    if (!member) throw new NotFoundError('No member with this id in this organization')
+    if (member.user.equals(me.user)) throw new BadRequestError('To remove yourself, leave the organization instead')
+    if (member.role === 'owner' && (await countOwners(organization._id, session)) === 1) {
+      throw new ConflictError(LAST_OWNER)
+    }
+
+    await member.deleteOne({ session })
+    await revokeInvitesFrom(organization._id, member.user, session)
+  })
+
+  res.status(StatusCodes.OK).json({ msg: 'Member removed' })
+}
+
 // Not required by the brief, built to make the "owner leaves" decision concrete (see README):
-// the last owner can't leave. Auto-promoting could hand the team to a viewer, deleting would
-// wipe a pipeline other people rely on, so the owner has to pick a successor first.
+// the last owner can't leave while others are in the team. Auto-promoting could hand the team to
+// a viewer, deleting would wipe a pipeline other people rely on, so the owner picks a successor.
+// An owner who is the only member is the exception: nobody else relies on it, so the team goes.
 export const leaveOrg = async (req, res) => {
   const membership = await membershipIn(req)
+  const { organization } = membership
+  if (organization.personalOf) throw new BadRequestError("You can't leave your Personal workspace")
 
-  if (membership.organization.personalOf) throw new BadRequestError("You can't leave your Personal workspace")
-  if (membership.role === 'owner' && (await countOwners(membership.organization._id)) === 1) {
-    throw new ConflictError("You're the last owner. Make someone else an owner before leaving.")
-  }
+  const msg = await ownerChange(organization._id, req.user.userId, async (session, me) => {
+    if (!me) throw new ForbiddenError("You're not a member of this organization")
 
-  await membership.deleteOne()
-  res.status(StatusCodes.OK).json({ msg: `You left ${membership.organization.name}` })
+    if (me.role === 'owner') {
+      const members = await Membership.countDocuments({ organization: organization._id }).session(session)
+      if (members === 1) {
+        await Job.deleteMany({ organization: organization._id }, { session })
+        await Invitation.deleteMany({ organization: organization._id }, { session })
+        await me.deleteOne({ session })
+        await Organization.deleteOne({ _id: organization._id }, { session })
+        return `${organization.name} was deleted`
+      }
+      if ((await countOwners(organization._id, session)) === 1) {
+        throw new ConflictError("You're the last owner. Make someone else an owner before leaving.")
+      }
+      await revokeInvitesFrom(organization._id, me.user, session)
+    }
+
+    await me.deleteOne({ session })
+    return `You left ${organization.name}`
+  })
+
+  res.status(StatusCodes.OK).json({ msg })
 }
