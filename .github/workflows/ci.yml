@@ -16,6 +16,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - run: npm test
+      # coverage report in the log, and the 65% threshold fails the build
+      - run: npm test -- --coverage
       - run: npm run test:client
       - run: npm run build
