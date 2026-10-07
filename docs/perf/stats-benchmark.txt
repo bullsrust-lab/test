@@ -1,5 +1,5 @@
 GET /api/v1/stats  Northwind Talent, 500 jobs, 3 members
-node v22.23.3, 300 sequential requests after 20 warm-up
+node v22.23.3, MongoDB 8.2, Ryzen 7 9800X3D desktop, 300 sequential requests after 20 warm-up
 
   min   2.7 ms
   p50   3.0 ms

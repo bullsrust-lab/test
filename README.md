@@ -7,7 +7,7 @@ Built as a test task (step 1: junior, step 2: team version).
 **Live:** https://jobtrail-two.vercel.app
 **Demo:** click "Look around with a demo account" on the login page (read-only, ~75 sample jobs).
 
-> Hosted on Vercel (React build on the CDN, the Express API as a serverless function) with MongoDB Atlas. The brief says Render, but v1 was reviewed on this Vercel URL, so v2 stays here. The migration runs in the Vercel build step and traffic only switches after it succeeds, which is the same guarantee as the Render start-command hook. `render.yaml` is there and works too, see [Deploying](#deploying).
+> Hosted on Vercel (React build on the CDN, the Express API as a serverless function) with MongoDB Atlas. The brief says Render, but v1 was reviewed on this Vercel URL, so v2 stays here. The migration runs in the Vercel build step and traffic only switches after it succeeds, which is the same guarantee as the Render start-command hook. `render.yaml` with that hook is in the repo, but v2 isn't running on Render, see [Deploying](#deploying).
 
 ![All jobs page with the follow-up panel](docs/jobs-light.png)
 
@@ -33,7 +33,7 @@ Built as a test task (step 1: junior, step 2: team version).
 - **Invitations.** Owners invite by email and get a link. The invitee either joins in one click (already signed in), logs in, or creates an account straight from the link. Links are single-use and expire after 7 days.
 - **`GET /stats`.** One aggregation pipeline (`$match` → `$facet` → `$project`): counts by status, the last 6 months with zeros filled in, top 3 companies. p95 is **3.3 ms** on the 500-job dataset ([benchmark output](docs/perf/stats-benchmark.txt)).
 - **Migration `001-orgs`.** Gives every existing user a Personal org and moves their jobs into it. It's idempotent and runs on every deploy.
-- **Tests.** 77 API tests on an in-memory MongoDB replica set (coverage of controllers/models/migrations: 93.6% of statements) and 7 React Testing Library tests for the invite page.
+- **Tests.** 78 API tests on an in-memory MongoDB replica set (coverage of controllers/models/migrations: 93.6% of statements) and 8 React Testing Library tests for the invite page.
 - **Architecture decisions:** [docs/adr](docs/adr): [permission model](docs/adr/ADR-001-permission-model.md), [legacy data migration](docs/adr/ADR-002-legacy-data-migration.md), [invitation UX](docs/adr/ADR-003-invitation-ux.md).
 
 ## What's in it (v1)
@@ -128,20 +128,23 @@ npm run migrate
 
 `server/migrations/run.js` runs every migration in order and prints what each one did. There is one so far, [`001-orgs`](server/migrations/001-orgs.js):
 
+This is its first run on the live database:
+
 ```
 001-orgs
   users processed                                  2
   orgs created                                     2
-  jobs migrated                                    77
-  users already migrated (skipped)                 1
+  jobs migrated                                    75
+  users already migrated (skipped)                 0
   jobs whose author no longer exists (left as is)  0
+  took                                             908 ms
 ```
 
 It creates a Personal organization for every user who has no membership, makes them its owner and moves their jobs (those without an organization) into it. Running it again changes nothing (`users processed 0`, everything skipped). There's a test that asserts exactly that, and one that runs two migrations at the same time. A run that died halfway is finished by the next one. [ADR-002](docs/adr/ADR-002-legacy-data-migration.md) explains how.
 
-It runs on every deploy: in the Vercel build command (`npm run migrate && npm run build`, see `vercel.json`) and in the Render start command (`npm run migrate && npm start`, see `render.yaml`). With nothing to do it exits 0 in a few milliseconds. If it fails, it exits 1: the build or start fails and the previous deployment keeps serving. The migration only adds fields, so v1 code keeps working on migrated data.
+It runs on every deploy: in the Vercel build command (`npm run migrate && npm run build`, see `vercel.json`) and in the Render start command (`npm run migrate && npm start`, see `render.yaml`). With nothing to do it prints zeros and exits 0. If it fails, it exits 1: the build or start fails and the previous deployment keeps serving. The migration only adds fields, so v1 code keeps working on migrated data.
 
-On the live database: [docs/deploy/001-orgs-production.txt](docs/deploy/001-orgs-production.txt). The first run moved 75 jobs, the second one (the production build of the same commit) found nothing to do.
+Both live runs are in [docs/deploy/001-orgs-production.txt](docs/deploy/001-orgs-production.txt): the first one above, then the production build of the same commit, which found nothing to do.
 
 ### Team seed and the stats benchmark
 
@@ -155,7 +158,7 @@ SEED_URL="mongodb://localhost:27017/jobtrail_seed?replicaSet=rs0" npm run bench:
 
 What it does with existing data (one of the open questions in the brief): it **only ever touches its own data**. Re-running removes the previous seed (its org, its users, their jobs) and creates it again. If the database has any other users, it refuses to run unless you pass `--force`, and even then it leaves that data alone. Wiping the database first is one wrong `SEED_URL` away from deleting production. Appending blindly would pile up duplicates on every run. Refusing whenever the database isn't empty would make it impossible to re-run.
 
-`bench:stats` starts the app on a random port, signs in as the seeded owner and sends 300 sequential requests to `GET /api/v1/stats` (after 20 warm-up ones). Result on my laptop (Ryzen 7 9800X3D, MongoDB 8.2), full output in [docs/perf/stats-benchmark.txt](docs/perf/stats-benchmark.txt):
+`bench:stats` starts the app on a random port, signs in as the seeded owner and sends 300 sequential requests to `GET /api/v1/stats` (after 20 warm-up ones). Result on my desktop (Ryzen 7 9800X3D, MongoDB 8.2), full output in [docs/perf/stats-benchmark.txt](docs/perf/stats-benchmark.txt):
 
 ```
 GET /api/v1/stats  Northwind Talent, 500 jobs, 3 members
@@ -164,6 +167,8 @@ GET /api/v1/stats  Northwind Talent, 500 jobs, 3 members
   p99   3.5 ms
   index used: organization_1_createdAt_-1, documents examined: 500
 ```
+
+That machine is faster than the "laptop-class" one in the brief, so the same check also runs as a test (`server/tests/stats.test.js`: seed the 500 jobs, 60 requests, p95 under 200 ms). It passes in CI on GitHub's standard Linux runner.
 
 ## Teams, roles and invitations
 
@@ -183,7 +188,7 @@ Owners can also remove members. Role changes, removals and leaving run in a tran
 
 ## API
 
-All routes are under `/api/v1`. Errors always come back as `{ "msg": "..." }`. Validation errors add an `errors` array with the field names, and a few errors add a machine-readable `code`.
+All routes are under `/api/v1`. Errors from the API come back as `{ "msg": "..." }` (a request Vercel rejects before it reaches the app, like a broken URL encoding, gets Vercel's plain-text 400). Validation errors add an `errors` array with the field names, and a few errors add a machine-readable `code`.
 
 Org-scoped routes (`/jobs/*`, `/stats/*`) act in the organization from the `X-Org-Id` header. Without the header they act in your Personal workspace. A malformed id answers 400. An org you're not a member of answers 403 with `code: "NOT_A_MEMBER"`, whether it exists or not.
 
@@ -224,6 +229,8 @@ Org-scoped routes (`/jobs/*`, `/stats/*`) act in the organization from the `X-Or
       "organization": "6ac6...",
       "createdBy": "6ac6...",
       "createdByName": "Ravi Patel",
+      "statusChangedAt": "2026-10-04T15:40:00.000Z",
+      "repliedAt": "2026-10-04T15:40:00.000Z",
       "createdAt": "2026-10-01T09:12:00.000Z",
       "updatedAt": "2026-10-04T15:40:00.000Z"
     }
@@ -232,6 +239,8 @@ Org-scoped routes (`/jobs/*`, `/stats/*`) act in the organization from the `X-Or
   "numOfPages": 5
 }
 ```
+
+`statusChangedAt`, `repliedAt` (the first move out of `pending`) and `followedUpAt` are set by the server and feed the follow-up panel and the reply-time stat. A job only has them once they happen. Each filter takes one value: `?status=pending&status=interview` is a 400.
 
 ### Stats (org-scoped)
 
@@ -270,7 +279,7 @@ These take the org from the URL, not from `X-Org-Id`. Not being a member answers
 | POST   | `/orgs/:orgId/invitations`            | owner        | `{ email, role }` → 201 `{ invitation, token, inviteUrl }`. 400 for a Personal workspace, 409 if already a member; inviting the same address again cancels the old link |
 | DELETE | `/orgs/:orgId/invitations/:id`        | owner        | cancels a pending invitation |
 | PATCH  | `/orgs/:orgId/memberships/:id`        | owner        | `{ role }`; 409 if it would leave the org without an owner |
-| DELETE | `/orgs/:orgId/memberships/:id`        | owner        | removes a member; 409 for the last owner (use `/me` to leave) |
+| DELETE | `/orgs/:orgId/memberships/:id`        | owner        | removes a member; 400 for yourself (use `/me` to leave) |
 | DELETE | `/orgs/:orgId/memberships/me`         | member       | leave; 409 for the last owner of a team with other members, deletes the team if you're its only member, 400 for your Personal workspace |
 
 ### Invitations (public)
@@ -280,19 +289,19 @@ These take the org from the URL, not from `X-Org-Id`. Not being a member answers
 | GET    | `/invitations/:token`         | preview: `{ invitation: { email, role, expiresAt, organization, invitedBy } }`. It doesn't say whether the email is registered ([ADR-003](docs/adr/ADR-003-invitation-ux.md)) |
 | POST   | `/invitations/:token/accept`  | signed in with the invited email → 200 `{ organization, role }`; signed in as someone else → 403; not signed in and no account → body `{ password, name? }` → 201 `{ user, token, organization, role }`; not signed in but the account exists → 409 (log in first) |
 
-Both answer 404 for an unknown token and **410 Gone** for an expired, used or cancelled one.
+Both answer 400 for a malformed token, 404 for an unknown one and **410 Gone** for an expired, used or cancelled one.
 
 Status codes overall: 200, 201, 400 (validation, bad id), 401 (no/invalid token, wrong credentials), 403 (role too low, not a member, wrong account for an invite, demo user writes), 404, 409, 410, 413 (body over 10 kB), 429 (rate limits).
 
 ## Tests
 
 ```bash
-npm test                 # 77 API tests
+npm test                 # 78 API tests
 npm test -- --coverage   # + coverage, threshold 65%
-npm run test:client      # 7 React Testing Library tests
+npm run test:client      # 8 React Testing Library tests
 ```
 
-The API tests run on one in-memory MongoDB replica set (transactions need one), with a separate database per test file. They cover both invitation flows and every 4xx/410 branch, writes as owner/recruiter/viewer, stats against a fixture whose numbers are worked out by hand (plus a check that `/stats` makes exactly one `aggregate()` call and no `find()`), the 500-job seed with a p95 check, the migration (twice in a row, twice at the same time, after a simulated crash), and the v1 regression flow: register → create → filter → paginate → delete.
+The API tests run on one in-memory MongoDB replica set (transactions need one), with a separate database per test file. They cover both invitation flows and every documented 4xx/410 response, writes as owner/recruiter/viewer, stats against a fixture whose numbers are worked out by hand (plus a check that `/stats` makes exactly one `aggregate()` call and no `find()`), the 500-job seed with a p95 check, the migration (twice in a row, twice at the same time, after a simulated crash), and the v1 regression flow: register → create → filter → paginate → delete.
 
 Coverage of `server/controllers`, `server/models` and `server/migrations` (the runner included): 93.6% statements, 80.7% branches, 100% functions, 96.6% lines.
 
@@ -332,6 +341,8 @@ The same Express app runs two ways, so it can go on either host.
 
 `vercel.json` runs the migrations and builds the client in one build command, serves `client/dist` from Vercel's CDN and sends `/api/*` to `api/index.mjs`. That's a small wrapper that runs the Express app as one serverless function and reuses the MongoDB connection while the function is warm. Vercel switches traffic only after a successful build, so a failing migration never takes the site down.
 
+The functions run in `cdg1` (Paris), next to the Atlas cluster. In Vercel's default US region every database round trip crossed the Atlantic and `/stats` took about 300 ms from the UK. Preview and production deployments share the one free Atlas database, so a preview build runs the migration on it too. That's safe because the migration only adds and is idempotent, but with real users previews would get their own database.
+
 1. Import the repo in Vercel (no framework preset needed, `vercel.json` has the settings).
 2. Add environment variables: `MONGO_URI` and `JWT_SECRET` (32+ random characters). Vercel sets `NODE_ENV` itself.
 3. Deploy.
@@ -340,7 +351,7 @@ The API rate limits keep their counters in memory, so on serverless each warm in
 
 ### Render
 
-`render.yaml` describes one Web Service that serves both the API and the built React app, with `npm run migrate && npm start` as the start command. New → Blueprint, point it at the repo, and fill in `MONGO_URI` (Render generates `JWT_SECRET`). The free plan sleeps after 15 minutes, so the first request can take up to a minute.
+Not used for the live link (v1 was reviewed on Vercel, so v2 stayed there), but ready if you want it on Render as the brief describes. `render.yaml` describes one Web Service that serves both the API and the built React app, with `npm run migrate && npm start` as the start command. New → Blueprint, point it at the repo, and fill in `MONGO_URI` (Render generates `JWT_SECRET`). The free plan sleeps after 15 minutes, so the first request can take up to a minute.
 
 ### Both
 
