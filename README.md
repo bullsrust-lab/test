@@ -7,7 +7,7 @@ Built as a test task (step 1: junior, step 2: team version).
 **Live:** https://jobtrail-two.vercel.app
 **Demo:** click "Look around with a demo account" on the login page (read-only, ~75 sample jobs).
 
-> Hosted on Vercel (React build on the CDN, the Express API as a serverless function) with MongoDB Atlas.
+> Hosted on Vercel (React build on the CDN, the Express API as a serverless function) with MongoDB Atlas. The brief says Render, but v1 was reviewed on this Vercel URL, so v2 stays here. The migration runs in the Vercel build step and traffic only switches after it succeeds, which is the same guarantee as the Render start-command hook. `render.yaml` is there and works too, see [Deploying](#deploying).
 
 ![All jobs page with the follow-up panel](docs/jobs-light.png)
 
@@ -33,7 +33,7 @@ Built as a test task (step 1: junior, step 2: team version).
 - **Invitations.** Owners invite by email and get a link. The invitee either joins in one click (already signed in), logs in, or creates an account straight from the link. Links are single-use and expire after 7 days.
 - **`GET /stats`.** One aggregation pipeline (`$match` → `$facet` → `$project`): counts by status, the last 6 months with zeros filled in, top 3 companies. p95 is **3.3 ms** on the 500-job dataset ([benchmark output](docs/perf/stats-benchmark.txt)).
 - **Migration `001-orgs`.** Gives every existing user a Personal org and moves their jobs into it. It's idempotent and runs on every deploy.
-- **Tests.** 68 API tests on an in-memory MongoDB replica set (coverage of controllers/models/migrations: 96% of statements) and 6 React Testing Library tests for the invite form.
+- **Tests.** 77 API tests on an in-memory MongoDB replica set (coverage of controllers/models/migrations: 93.6% of statements) and 7 React Testing Library tests for the invite page.
 - **Architecture decisions:** [docs/adr](docs/adr): [permission model](docs/adr/ADR-001-permission-model.md), [legacy data migration](docs/adr/ADR-002-legacy-data-migration.md), [invitation UX](docs/adr/ADR-003-invitation-ux.md).
 
 ## What's in it (v1)
@@ -175,7 +175,9 @@ Why these three and how they combine with the old `checkPermission`: [ADR-001](d
 
 Invitations: [ADR-003](docs/adr/ADR-003-invitation-ux.md). Personal workspaces can't be shared, and inviting an existing member answers 409.
 
-**What happens when an owner leaves** (the other open question): the last owner can't leave. `DELETE /orgs/:id/memberships/me` answers 409 until someone else is an owner (`PATCH /orgs/:id/memberships/:membershipId` changes roles). Auto-promoting could hand the team to a viewer, often someone outside the agency. Deleting the org would wipe a pipeline other people rely on. Making the owner pick a successor is one extra click, and it's the only option that can't go wrong silently. The same rule stops an owner from demoting themselves when they're the only one. Nobody can leave their Personal workspace.
+**What happens when an owner leaves** (the other open question): the last owner can't leave while anyone else is in the team. `DELETE /orgs/:id/memberships/me` answers 409 until someone else is an owner (`PATCH /orgs/:id/memberships/:membershipId` changes roles). Auto-promoting could hand the team to a viewer, often someone outside the agency. Deleting the org would wipe a pipeline other people rely on. Making the owner pick a successor is one extra click, and it's the only option that can't go wrong silently. The same rule stops an owner from demoting themselves when they're the only one. If the owner is the only member, leaving deletes the team with its jobs and invitations (the Team page calls it "Delete team" and asks first). Nobody can leave their Personal workspace.
+
+Owners can also remove members. Role changes, removals and leaving run in a transaction that also writes the organization document, so two owner changes at the same moment (say, one owner demotes the other while leaving) can't leave a team with none: the second transaction conflicts, retries, sees the first one's change and gets the 409. There's a test for exactly that. When an owner is demoted or removed, the invite links they created are cancelled.
 
 ## API
 
@@ -266,13 +268,14 @@ These take the org from the URL, not from `X-Org-Id`. Not being a member answers
 | POST   | `/orgs/:orgId/invitations`            | owner        | `{ email, role }` → 201 `{ invitation, token, inviteUrl }`. 400 for a Personal workspace, 409 if already a member; inviting the same address again cancels the old link |
 | DELETE | `/orgs/:orgId/invitations/:id`        | owner        | cancels a pending invitation |
 | PATCH  | `/orgs/:orgId/memberships/:id`        | owner        | `{ role }`; 409 if it would leave the org without an owner |
-| DELETE | `/orgs/:orgId/memberships/me`         | member       | leave; 409 for the last owner, 400 for your Personal workspace |
+| DELETE | `/orgs/:orgId/memberships/:id`        | owner        | removes a member; 409 for the last owner (use `/me` to leave) |
+| DELETE | `/orgs/:orgId/memberships/me`         | member       | leave; 409 for the last owner of a team with other members, deletes the team if you're its only member, 400 for your Personal workspace |
 
 ### Invitations (public)
 
 | Method | Path                          | Notes |
 | ------ | ----------------------------- | ----- |
-| GET    | `/invitations/:token`         | preview: `{ invitation: { email, role, expiresAt, organization, invitedBy }, hasAccount }` |
+| GET    | `/invitations/:token`         | preview: `{ invitation: { email, role, expiresAt, organization, invitedBy } }`. It doesn't say whether the email is registered ([ADR-003](docs/adr/ADR-003-invitation-ux.md)) |
 | POST   | `/invitations/:token/accept`  | signed in with the invited email → 200 `{ organization, role }`; signed in as someone else → 403; not signed in and no account → body `{ password, name? }` → 201 `{ user, token, organization, role }`; not signed in but the account exists → 409 (log in first) |
 
 Both answer 404 for an unknown token and **410 Gone** for an expired, used or cancelled one.
@@ -282,14 +285,14 @@ Status codes overall: 200, 201, 400 (validation, bad id), 401 (no/invalid token,
 ## Tests
 
 ```bash
-npm test                 # 68 API tests
+npm test                 # 77 API tests
 npm test -- --coverage   # + coverage, threshold 65%
-npm run test:client      # 6 React Testing Library tests
+npm run test:client      # 7 React Testing Library tests
 ```
 
 The API tests run on one in-memory MongoDB replica set (transactions need one), with a separate database per test file. They cover both invitation flows and every 4xx/410 branch, writes as owner/recruiter/viewer, stats against a fixture whose numbers are worked out by hand (plus a check that `/stats` makes exactly one `aggregate()` call and no `find()`), the 500-job seed with a p95 check, the migration (twice in a row, twice at the same time, after a simulated crash), and the v1 regression flow: register → create → filter → paginate → delete.
 
-Coverage of `server/controllers`, `server/models` and `server/migrations`: 96.8% statements, 86.7% branches, 100% functions, 98.9% lines.
+Coverage of `server/controllers`, `server/models` and `server/migrations` (the runner included): 93.6% statements, 80.7% branches, 100% functions, 96.6% lines.
 
 ## Project structure
 

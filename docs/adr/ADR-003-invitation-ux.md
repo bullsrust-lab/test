@@ -8,17 +8,18 @@ An owner invites by email, often before that person has an account. One endpoint
 
 ## Decision
 
-Before anyone types, the `/invite/:token` page calls `GET /invitations/:token` (org, role, inviter, `hasAccount`) and shows exactly one thing:
+The `/invite/:token` page reads `GET /invitations/:token` (org, role, inviter, email) and shows one form:
 
 - **signed in, matching email:** one "Join" button;
 - **signed in as someone else:** the API answers 403, the page offers to log out;
-- **no account:** set a password, name optional. Account, Personal workspace, membership and the used-up link are written in **one transaction**, so nobody ends up with an account but no team, or a dead link but no account;
-- **account exists, not signed in:** 409; the page shows a login form with the email fixed, then accepts with the new session.
+- **not signed in:** "set a password" by default, with a "Log in instead" link. Account, Personal workspace, membership and the used-up link are written in **one transaction**, so nobody ends up with an account but no team. If the address is already registered, the API answers 409 and the page switches to login with the email fixed.
 
-The alternative was one form for everyone: in the anonymous flow, treat the password as a login when the account exists. Rejected: the same field would mean "create" for some people and "prove" for others, a typo would look like a broken invite, and the accept endpoint would become a second login that needs its own brute-force protection.
+The alternative was one form for everyone: treat the password as a login when the account exists. Rejected: the same field would mean "create" for some people and "prove" for others, a typo would look like a broken invite, and the accept endpoint would become a second login needing its own brute-force protection.
 
-The API returns the token and a full `inviteUrl`. Owners share the URL (there's no mailer yet); the token is for API clients and tests. Only a SHA-256 of the token is stored, so a database dump can't be used to join a team. Links are single-use, last 7 days, and re-inviting cancels the old one.
+An earlier version returned `hasAccount` in the preview to pick the form up front. Dropped: an unauthenticated GET shouldn't say who is registered.
+
+The API returns the token and a full `inviteUrl`, since there's no mailer yet. Only a SHA-256 of the token is stored. Links are single-use, last 7 days, and re-inviting cancels the old one.
 
 ## Consequences
 
-`hasAccount` tells the link holder whether the address is registered. That's acceptable because the link was sent to that address. Personal workspaces can't be shared (400), so "Personal" still means "only you". Without email delivery, owners pass links on themselves.
+Existing users may hit a 409 before the login form. That 409 still reveals the address is registered, but only on a rate-limited POST with a valid link made for that address. Personal workspaces can't be shared. Owners pass links on themselves.
