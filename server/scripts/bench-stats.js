@@ -23,7 +23,8 @@ const ms = (n) => `${n.toFixed(1)} ms`
 
 const run = async () => {
   if (!process.env.SEED_URL) throw new Error('Set SEED_URL (the database you seeded with npm run seed:team)')
-  // the bench signs its own token, it doesn't need (or want) the production secret
+  // no per-request logging (it would skew the timings), and a throwaway signing secret
+  process.env.NODE_ENV = 'benchmark'
   process.env.JWT_SECRET ||= crypto.randomBytes(32).toString('hex')
 
   await connectDB(process.env.SEED_URL)

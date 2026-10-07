@@ -1,0 +1,60 @@
+GET /api/v1/stats  Northwind Talent, 500 jobs, 3 members
+node v22.23.3, 300 sequential requests after 20 warm-up
+
+  min   2.7 ms
+  p50   3.0 ms
+  p90   3.2 ms
+  p95   3.3 ms   (ceiling: 200 ms)
+  p99   3.5 ms
+  max   3.7 ms
+
+  index used: organization_1_createdAt_-1, documents examined: 500
+
+response:
+{
+  "countsByStatus": {
+    "pending": 181,
+    "interview": 134,
+    "declined": 185
+  },
+  "applicationsPerMonth": [
+    {
+      "month": "2026-05",
+      "count": 49
+    },
+    {
+      "month": "2026-06",
+      "count": 75
+    },
+    {
+      "month": "2026-07",
+      "count": 72
+    },
+    {
+      "month": "2026-08",
+      "count": 55
+    },
+    {
+      "month": "2026-09",
+      "count": 87
+    },
+    {
+      "month": "2026-10",
+      "count": 19
+    }
+  ],
+  "topCompanies": [
+    {
+      "company": "Brightside",
+      "count": 41
+    },
+    {
+      "company": "Parkside Agency",
+      "count": 34
+    },
+    {
+      "company": "Kingfisher Labs",
+      "count": 33
+    }
+  ]
+}

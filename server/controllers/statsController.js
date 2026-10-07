@@ -30,7 +30,7 @@ export const statsPipeline = (organizationId) => [
         { $group: { _id: '$company', count: { $sum: 1 } } },
         { $sort: { count: -1, _id: 1 } },
         { $limit: 3 },
-        { $project: { _id: 0, company: '$_id', count: 1 } },
+        { $project: { _id: 0, company: '$_id', count: '$count' } },
       ],
     },
   },
@@ -54,7 +54,7 @@ export const statsPipeline = (organizationId) => [
           },
         },
       },
-      topCompanies: 1,
+      topCompanies: '$topCompanies',
     },
   },
 ]
