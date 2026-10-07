@@ -341,7 +341,7 @@ The same Express app runs two ways, so it can go on either host.
 
 `vercel.json` runs the migrations and builds the client in one build command, serves `client/dist` from Vercel's CDN and sends `/api/*` to `api/index.mjs`. That's a small wrapper that runs the Express app as one serverless function and reuses the MongoDB connection while the function is warm. Vercel switches traffic only after a successful build, so a failing migration never takes the site down.
 
-The functions run in `cdg1` (Paris), next to the Atlas cluster. In Vercel's default US region every database round trip crossed the Atlantic and `/stats` took about 300 ms from the UK. Preview and production deployments share the one free Atlas database, so a preview build runs the migration on it too. That's safe because the migration only adds and is idempotent, but with real users previews would get their own database.
+The functions run in `cdg1` (Paris), next to the Atlas cluster. In Vercel's default US region every database round trip crossed the Atlantic and `/stats` took about 300 ms from the UK. From Paris it's about 100 ms, network included (p95 110 ms over 20 requests). Preview and production deployments share the one free Atlas database, so a preview build runs the migration on it too. That's safe because the migration only adds and is idempotent, but with real users previews would get their own database.
 
 1. Import the repo in Vercel (no framework preset needed, `vercel.json` has the settings).
 2. Add environment variables: `MONGO_URI` and `JWT_SECRET` (32+ random characters). Vercel sets `NODE_ENV` itself.
