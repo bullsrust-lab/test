@@ -141,6 +141,8 @@ It creates a Personal organization for every user who has no membership, makes t
 
 It runs on every deploy: in the Vercel build command (`npm run migrate && npm run build`, see `vercel.json`) and in the Render start command (`npm run migrate && npm start`, see `render.yaml`). With nothing to do it exits 0 in a few milliseconds. If it fails, it exits 1: the build or start fails and the previous deployment keeps serving. The migration only adds fields, so v1 code keeps working on migrated data.
 
+On the live database: [docs/deploy/001-orgs-production.txt](docs/deploy/001-orgs-production.txt). The first run moved 75 jobs, the second one (the production build of the same commit) found nothing to do.
+
 ### Team seed and the stats benchmark
 
 ```bash
