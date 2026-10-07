@@ -33,10 +33,22 @@ const JobSchema = new mongoose.Schema(
       trim: true,
       maxlength: 80,
     },
+    // permissions come from the organization, createdBy is only "who added it"
+    organization: {
+      type: mongoose.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+    },
     createdBy: {
       type: mongoose.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    // copied from the author so a team list doesn't need a second query per card;
+    // kept in sync when the author renames themselves (userController.updateUser)
+    createdByName: {
+      type: String,
+      trim: true,
     },
     // set by the server only (never taken from the request body), used for follow-up reminders
     statusChangedAt: Date,
@@ -46,8 +58,11 @@ const JobSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-JobSchema.index({ createdBy: 1, createdAt: -1 })
-JobSchema.index({ createdBy: 1, position: 1 })
+// every read is scoped to one organization, these cover the list (latest/oldest, a-z/z-a) and stats
+JobSchema.index({ organization: 1, createdAt: -1 })
+JobSchema.index({ organization: 1, position: 1 })
+// renames and the migration look jobs up by author
+JobSchema.index({ createdBy: 1 })
 
 // a job leaving "pending" for the first time is when the company replied
 JobSchema.pre('save', function () {

@@ -25,6 +25,18 @@ export class ForbiddenError extends ApiError {
   }
 }
 
+export class ConflictError extends ApiError {
+  constructor(message) {
+    super(message, StatusCodes.CONFLICT)
+  }
+}
+
+export class GoneError extends ApiError {
+  constructor(message) {
+    super(message, StatusCodes.GONE)
+  }
+}
+
 export class NotFoundError extends ApiError {
   constructor(message) {
     super(message, StatusCodes.NOT_FOUND)
