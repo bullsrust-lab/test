@@ -28,6 +28,10 @@ const steps = [
     text: 'After ten days without a reply the job moves into a short list, with a polite check-in email ready to copy. A month of silence gets it stamped "no reply" so you can stop waiting.',
   },
   {
+    title: 'Share the list with a team',
+    text: 'Create a team and invite people by link, even before they have an account. Recruiters add and edit jobs, a hiring manager can follow along as a viewer.',
+  },
+  {
     title: 'Find anything fast',
     text: 'Search by position, filter by status or type, sort by date or name. Filters stay in the URL, so the back button works.',
   },

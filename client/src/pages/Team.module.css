@@ -1,0 +1,197 @@
+.card {
+  max-width: 860px;
+  margin-bottom: 16px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cardTitle {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.inlineForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  max-width: 520px;
+}
+
+.inlineForm > :first-child {
+  flex: 1;
+}
+
+.inviteForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.linkBox {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-size: 14px;
+}
+
+.linkRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.linkRow input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.members {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.members li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.members li + li {
+  border-top: 1px dashed var(--border);
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.who {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.who b {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.who span {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.you {
+  font-weight: 400;
+}
+
+.roleSelect {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.role {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.owner {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.viewer {
+  background: var(--pending-bg);
+  color: var(--pending);
+}
+
+.leave {
+  max-width: 860px;
+  margin-top: 8px;
+}
+
+.leaveBtn {
+  background: transparent;
+  color: var(--danger);
+  padding-left: 0;
+}
+
+.leaveBtn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 860px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.modalText {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+@media (max-width: 700px) {
+  .inviteForm {
+    grid-template-columns: 1fr;
+  }
+
+  .inlineForm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .members li {
+    flex-wrap: wrap;
+  }
+}
