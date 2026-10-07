@@ -31,7 +31,7 @@ function DashboardLayout() {
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
   const { user, isDemo, logout } = useAuth()
-  const { active, loading: orgsLoading } = useOrg()
+  const { active, canWrite, loading: orgsLoading } = useOrg()
   const navigate = useNavigate()
   const menuBtnRef = useRef(null)
   const closeBtnRef = useRef(null)
@@ -110,12 +110,15 @@ function DashboardLayout() {
         <OrgSwitcher />
 
         <nav className={styles.nav} aria-label="Dashboard">
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
-              <Icon />
-              {label}
-            </NavLink>
-          ))}
+          {links
+            // viewers can't add jobs, so don't offer it
+            .filter((link) => link.to !== 'add-job' || canWrite)
+            .map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
+                <Icon />
+                {label}
+              </NavLink>
+            ))}
         </nav>
 
         <button type="button" className={`${styles.link} ${styles.logout}`} onClick={handleLogout}>

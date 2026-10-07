@@ -136,7 +136,11 @@ function FollowUps({ reloadKey, onChange }) {
 
           {data.jobs.length > VISIBLE && (
             <button type="button" className={styles.more} onClick={() => setShowAll(!showAll)}>
-              {showAll ? 'Show fewer' : `Show all ${data.jobs.length}`}
+              {showAll
+                ? 'Show fewer'
+                : data.dueCount > data.jobs.length
+                  ? `Show the ${data.jobs.length} quietest of ${data.dueCount}`
+                  : `Show all ${data.jobs.length}`}
             </button>
           )}
 
