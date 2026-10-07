@@ -9,7 +9,11 @@ import morgan from 'morgan'
 import authRoutes from './routes/authRoutes.js'
 import jobsRoutes from './routes/jobsRoutes.js'
 import userRoutes from './routes/userRoutes.js'
+import orgRoutes from './routes/orgRoutes.js'
+import invitationRoutes from './routes/invitationRoutes.js'
+import statsRoutes from './routes/statsRoutes.js'
 import auth from './middleware/auth.js'
+import orgContext from './middleware/orgContext.js'
 import demoUser from './middleware/demoUser.js'
 import notFound from './middleware/notFound.js'
 import errorHandler from './middleware/errorHandler.js'
@@ -51,7 +55,11 @@ app.use('/api/v1', apiLimiter)
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/users', auth, demoUser, userRoutes)
-app.use('/api/v1/jobs', auth, demoUser, jobsRoutes)
+app.use('/api/v1/orgs', auth, demoUser, orgRoutes)
+app.use('/api/v1/invitations', invitationRoutes)
+// org-scoped: orgContext resolves X-Org-Id (or the Personal workspace) into req.org
+app.use('/api/v1/jobs', auth, demoUser, orgContext, jobsRoutes)
+app.use('/api/v1/stats', auth, orgContext, statsRoutes)
 app.use('/api', notFound)
 
 if (process.env.NODE_ENV === 'production') {
