@@ -266,6 +266,7 @@ function Team() {
             jobs, viewers (a hiring manager, say) can only look.
           </p>
           <CreateTeamForm onCreated={openTeam} />
+          {isDemo && <p className={styles.muted}>The demo account can't create teams. Sign up to try it.</p>}
         </section>
       </>
     )

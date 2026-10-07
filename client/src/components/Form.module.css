@@ -30,8 +30,15 @@
   opacity: 0.8;
 }
 
-.input:hover {
+.input:hover:not(:disabled) {
   border-color: var(--text-muted);
+}
+
+/* read-only (demo, viewers): make it visible on the field, not just on the button */
+.input:disabled {
+  background-color: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 .input:focus-visible {
