@@ -4,7 +4,7 @@ import JobForm from '../components/JobForm'
 import PageHeader from '../components/PageHeader'
 import Spinner from '../components/Spinner'
 import api, { getErrorMessage } from '../api/client'
-import { useAuth } from '../context/AuthContext'
+import { useOrg } from '../context/OrgContext'
 import { useToast } from '../context/ToastContext'
 import styles from './AllJobs.module.css'
 
@@ -12,7 +12,7 @@ function EditJob() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { isDemo } = useAuth()
+  const { canWrite } = useOrg()
   const toast = useToast()
   const [job, setJob] = useState(null)
   const [error, setError] = useState('')
@@ -66,7 +66,7 @@ function EditJob() {
         submitLabel="Save changes"
         onSubmit={updateJob}
         onCancel={() => navigate(backTo)}
-        disabled={isDemo}
+        disabled={!canWrite}
       />
     </>
   )

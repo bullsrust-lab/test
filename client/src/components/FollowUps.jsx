@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api, { getErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useOrg } from '../context/OrgContext'
 import { useToast } from '../context/ToastContext'
 import { copyText } from '../utils/clipboard'
 import { FOLLOW_UP_AFTER, GHOSTED_AFTER, followUpEmail, quietDays } from '../utils/followUp'
@@ -19,6 +20,7 @@ function FollowUps({ reloadKey, onChange }) {
   const [collapsed, setCollapsed] = useState(() => getItem('followUpsCollapsed') === '1')
   const [busyId, setBusyId] = useState(null)
   const { user, isDemo } = useAuth()
+  const { canWrite } = useOrg()
   const toast = useToast()
 
   useEffect(() => {
@@ -119,8 +121,8 @@ function FollowUps({ reloadKey, onChange }) {
                       type="button"
                       className="btn btn-ghost btn-sm"
                       onClick={() => markDone(job)}
-                      disabled={isDemo || busyId === job._id}
-                      title={isDemo ? 'Read-only in the demo' : undefined}
+                      disabled={!canWrite || busyId === job._id}
+                      title={isDemo ? 'Read-only in the demo' : !canWrite ? 'Viewers are read-only' : undefined}
                       aria-label={`Mark ${job.position} at ${job.company} as followed up`}
                     >
                       <IconCheck size={15} />

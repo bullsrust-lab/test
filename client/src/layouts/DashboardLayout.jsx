@@ -3,8 +3,10 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import Spinner from '../components/Spinner'
 import ThemeToggle from '../components/ThemeToggle'
-import { IconChart, IconClose, IconList, IconLogout, IconMenu, IconPlus, IconUser } from '../components/Icons'
+import OrgSwitcher from '../components/OrgSwitcher'
+import { IconChart, IconClose, IconList, IconLogout, IconMenu, IconPlus, IconUser, IconUsers } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
+import { useOrg } from '../context/OrgContext'
 import { setSessionFlag } from '../utils/storage'
 import styles from './DashboardLayout.module.css'
 
@@ -12,6 +14,7 @@ const links = [
   { to: 'all-jobs', label: 'All jobs', icon: IconList },
   { to: 'add-job', label: 'Add job', icon: IconPlus },
   { to: 'stats', label: 'Stats', icon: IconChart },
+  { to: 'team', label: 'Team', icon: IconUsers },
   { to: 'profile', label: 'Profile', icon: IconUser },
 ]
 
@@ -28,6 +31,7 @@ function DashboardLayout() {
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
   const { user, isDemo, logout } = useAuth()
+  const { active, loading: orgsLoading } = useOrg()
   const navigate = useNavigate()
   const menuBtnRef = useRef(null)
   const closeBtnRef = useRef(null)
@@ -103,6 +107,8 @@ function DashboardLayout() {
           </button>
         </div>
 
+        <OrgSwitcher />
+
         <nav className={styles.nav} aria-label="Dashboard">
           {links.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
@@ -157,7 +163,7 @@ function DashboardLayout() {
 
         <main className={styles.content} ref={mainRef} tabIndex={-1}>
           <Suspense fallback={<Spinner />}>
-            <Outlet />
+            {orgsLoading && !active ? <Spinner /> : <Outlet key={active?._id ?? 'none'} />}
           </Suspense>
         </main>
       </div>

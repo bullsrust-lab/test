@@ -16,7 +16,7 @@ const orgContext = async (req, res, next) => {
       .lean()
     // same answer whether the org doesn't exist or you're just not in it
     if (!membership || !membership.organization) {
-      throw new ForbiddenError("You're not a member of this organization")
+      throw new ForbiddenError("You're not a member of this organization", 'NOT_A_MEMBER')
     }
 
     req.org = toContext(membership.organization, membership.role)

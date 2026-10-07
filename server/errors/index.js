@@ -1,9 +1,11 @@
 import { StatusCodes } from 'http-status-codes'
 
 export class ApiError extends Error {
-  constructor(message, statusCode) {
+  // code: optional machine-readable reason for the client, next to the human message
+  constructor(message, statusCode, code) {
     super(message)
     this.statusCode = statusCode
+    if (code) this.code = code
   }
 }
 
@@ -20,8 +22,8 @@ export class UnauthenticatedError extends ApiError {
 }
 
 export class ForbiddenError extends ApiError {
-  constructor(message = 'Not allowed to access this resource') {
-    super(message, StatusCodes.FORBIDDEN)
+  constructor(message = 'Not allowed to access this resource', code) {
+    super(message, StatusCodes.FORBIDDEN, code)
   }
 }
 

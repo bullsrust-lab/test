@@ -65,4 +65,5 @@ export const saveAuth = ({ user, token }) => {
 export const clearAuth = () => {
   removeItem('token')
   removeItem('user')
+  removeItem('orgId')
 }

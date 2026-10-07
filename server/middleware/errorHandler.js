@@ -34,6 +34,8 @@ const errorHandler = (err, req, res, _next) => {
   if (statusCode === StatusCodes.INTERNAL_SERVER_ERROR) console.error(err)
 
   const body = { msg }
+  // Mongo errors carry a numeric code too, only our own string codes go to the client
+  if (err.statusCode && typeof err.code === 'string') body.code = err.code
   if (Array.isArray(err.fields)) body.errors = err.fields
   res.status(statusCode).json(body)
 }
