@@ -95,3 +95,19 @@
 .warning b {
   overflow-wrap: anywhere;
 }
+
+.switch {
+  font-size: 14px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.switch button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -23,9 +23,8 @@ const preview = (overrides = {}) => ({
       expiresAt: '2026-10-14T12:00:00.000Z',
       organization: ORG,
       invitedBy: 'Olivia',
+      ...overrides,
     },
-    hasAccount: false,
-    ...overrides,
   },
 })
 const httpError = (status, msg) => Object.assign(new Error(msg), { response: { status, data: { msg } } })
@@ -92,9 +91,9 @@ describe('AcceptInvite', () => {
     expect(localStorage.getItem('orgId')).toBe('org1')
   })
 
-  it('asks an existing user to log in, then accepts with the new session', async () => {
+  it('lets someone with an account switch to logging in, then accepts with the new session', async () => {
     const user = userEvent.setup()
-    mockGet(Promise.resolve(preview({ hasAccount: true })))
+    mockGet(Promise.resolve(preview()))
     api.post.mockImplementation((url) =>
       url === '/auth/login'
         ? Promise.resolve({ data: { user: { _id: 'u3', name: 'Mei', email: 'mei@test.com' }, token: 'login-token' } })
@@ -102,7 +101,8 @@ describe('AcceptInvite', () => {
     )
     renderPage()
 
-    await user.type(await screen.findByLabelText('Password'), 'correct-horse-42')
+    await user.click(await screen.findByRole('button', { name: /log in instead/i }))
+    await user.type(screen.getByLabelText('Password'), 'correct-horse-42')
     await user.click(screen.getByRole('button', { name: /log in and join/i }))
 
     expect(api.post).toHaveBeenNthCalledWith(1, '/auth/login', { email: 'mei@test.com', password: 'correct-horse-42' })
@@ -147,10 +147,21 @@ describe('AcceptInvite', () => {
     expect(await screen.findByRole('button', { name: /create account and join/i })).toBeInTheDocument()
   })
 
+  it('treats a failed load as temporary, not as a dead link', async () => {
+    const user = userEvent.setup()
+    mockGet(Promise.reject(httpError(503, 'Database is not available, try again in a moment')))
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: /couldn't load the invitation/i })).toBeInTheDocument()
+    mockGet(Promise.resolve(preview()))
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    expect(await screen.findByRole('heading', { name: /join northwind talent/i })).toBeInTheDocument()
+  })
+
   it('joins in one click when signed in with the invited email', async () => {
     const user = userEvent.setup()
     signIn('mei@test.com')
-    mockGet(Promise.resolve(preview({ hasAccount: true })))
+    mockGet(Promise.resolve(preview()))
     api.post.mockResolvedValue({ data: { organization: ORG, role: 'recruiter' } })
     renderPage()
 

@@ -25,7 +25,9 @@ const ROLE_HINT = {
 }
 
 // One page, four situations: signed in as the invited address (one click), signed in as someone
-// else (log out first), not signed in with an existing account (log in), no account (set a password).
+// else (log out first), not signed in with an account (log in), no account (set a password).
+// The page can't know in advance whether the address has an account (the API deliberately doesn't
+// say), so it offers "create" and switches to "log in" by choice or when the API answers 409.
 function AcceptInvite() {
   const { token: inviteToken } = useParams()
   const { token, user, login, logout } = useAuth()
@@ -34,26 +36,33 @@ function AcceptInvite() {
   const toast = useToast()
 
   const [invite, setInvite] = useState(null)
+  // the link can't be used (404/410) vs. the preview just failed to load (network, 5xx)
   const [problem, setProblem] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
   const [values, setValues] = useState({ name: '', password: '' })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  // set when the server says the address already has an account after all
+  // log in instead of creating an account: chosen by the user, or after a 409 from the API
   const [mustLogIn, setMustLogIn] = useState(false)
 
   useDocumentTitle(invite ? `Join ${invite.invitation.organization.name}` : 'Invitation')
 
   useEffect(() => {
     const controller = new AbortController()
+    setLoadError('')
     api
       .get(`/invitations/${inviteToken}`, { signal: controller.signal })
       .then(({ data }) => setInvite(data))
       .catch((err) => {
-        if (!controller.signal.aborted) setProblem(getErrorMessage(err))
+        if (controller.signal.aborted) return
+        const status = err.response?.status
+        if (status === 404 || status === 410) setProblem(getErrorMessage(err))
+        else setLoadError(getErrorMessage(err))
       })
     return () => controller.abort()
-  }, [inviteToken])
+  }, [inviteToken, reloadKey])
 
   if (problem) {
     return (
@@ -67,16 +76,28 @@ function AcceptInvite() {
     )
   }
 
+  if (loadError) {
+    return (
+      <Shell>
+        <h1 className={styles.title}>Couldn't load the invitation</h1>
+        <p className={styles.lead}>{loadError}. The link itself may be fine, try again in a moment.</p>
+        <button type="button" className="btn btn-primary" onClick={() => setReloadKey((k) => k + 1)}>
+          Try again
+        </button>
+      </Shell>
+    )
+  }
+
   if (!invite) return <Spinner full />
 
-  const { invitation, hasAccount } = invite
+  const { invitation } = invite
   const org = invitation.organization
   const signedInAs = token ? user?.email : null
   const mode = signedInAs
     ? signedInAs === invitation.email
       ? 'join'
       : 'mismatch'
-    : hasAccount || mustLogIn
+    : mustLogIn
       ? 'login'
       : 'signup'
 
@@ -161,6 +182,13 @@ function AcceptInvite() {
     setErrors({ ...errors, [e.target.name]: undefined })
   }
 
+  const switchForm = (toLogin) => {
+    setMustLogIn(toLogin)
+    setFormError('')
+    setErrors({})
+    setValues({ ...values, password: '' })
+  }
+
   return (
     <Shell>
       <p className={styles.eyebrow}>Invitation</p>
@@ -200,7 +228,7 @@ function AcceptInvite() {
 
       {mode === 'login' && (
         <form onSubmit={submitLogin} noValidate className={styles.form}>
-          <p className={styles.formLead}>You already have a JobTrail account. Log in to accept.</p>
+          <p className={styles.formLead}>Log in with your JobTrail account to accept.</p>
           <FormRow label="Email" name="email" value={invitation.email} readOnly />
           <FormRow
             label="Password"
@@ -215,12 +243,18 @@ function AcceptInvite() {
           <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
             {submitting ? 'Please wait…' : 'Log in and join'}
           </button>
+          <p className={styles.switch}>
+            New to JobTrail?{' '}
+            <button type="button" onClick={() => switchForm(false)}>
+              Create an account instead
+            </button>
+          </p>
         </form>
       )}
 
       {mode === 'signup' && (
         <form onSubmit={submitSignup} noValidate className={styles.form}>
-          <p className={styles.formLead}>Create your account to join. Your email is already set.</p>
+          <p className={styles.formLead}>New here? Create your account to join, the email is already set.</p>
           <FormRow label="Email" name="email" value={invitation.email} readOnly />
           <FormRow
             label="Name (optional)"
@@ -246,6 +280,12 @@ function AcceptInvite() {
           <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
             {submitting ? 'Please wait…' : 'Create account and join'}
           </button>
+          <p className={styles.switch}>
+            Already use JobTrail with this email?{' '}
+            <button type="button" onClick={() => switchForm(true)}>
+              Log in instead
+            </button>
+          </p>
         </form>
       )}
     </Shell>
