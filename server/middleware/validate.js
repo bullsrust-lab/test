@@ -2,6 +2,7 @@ import { body, param, query, validationResult } from 'express-validator'
 import mongoose from 'mongoose'
 import { BadRequestError } from '../errors/index.js'
 import { JOB_STATUS, JOB_TYPE } from '../models/Job.js'
+import { ROLES } from '../models/Membership.js'
 
 // the usual suspects from leaked-password lists, checked case-insensitively
 const COMMON_PASSWORDS = new Set([
@@ -77,10 +78,9 @@ const email = () =>
     .withMessage('Please provide a valid email')
     .toLowerCase()
 
-export const validateRegister = withErrors([
-  name(),
-  email(),
-  body('password')
+// rules for choosing a password: registration and accepting an invitation without an account
+const newPassword = (chain) =>
+  chain
     .isString()
     .withMessage('Password is required')
     .bail()
@@ -91,8 +91,9 @@ export const validateRegister = withErrors([
     .withMessage('This password is too common, pick something else')
     // bcrypt only looks at the first 72 bytes, anything after that would be silently ignored
     .custom((value) => Buffer.byteLength(value, 'utf8') <= 72)
-    .withMessage('Password is too long'),
-])
+    .withMessage('Password is too long')
+
+export const validateRegister = withErrors([name(), email(), newPassword(body('password'))])
 
 export const validateLogin = withErrors([
   email(),
@@ -157,4 +158,51 @@ export const validateJobsQuery = withErrors([
     // MongoDB refuses a regex with a NUL byte in it (500 instead of a clean 400)
     .custom((value) => !value.includes(NUL))
     .withMessage('Invalid search'),
+])
+
+const objectId = (field, label) =>
+  param(field)
+    .custom((value) => mongoose.isValidObjectId(value))
+    .withMessage(`Invalid ${label} id`)
+
+export const validateOrgId = withErrors([objectId('orgId', 'organization')])
+
+export const validateOrgName = withErrors([
+  body('name')
+    .isString()
+    .withMessage('Name is required')
+    .bail()
+    .trim()
+    .isLength({ min: 3, max: 80 })
+    .withMessage('Name must be 3-80 characters'),
+])
+
+const role = () => body('role').isString().withMessage('Role is required').bail().isIn(ROLES).withMessage(`Role must be one of: ${ROLES.join(', ')}`)
+
+export const validateInvite = withErrors([objectId('orgId', 'organization'), email(), role()])
+
+export const validateInvitationId = withErrors([objectId('orgId', 'organization'), objectId('invitationId', 'invitation')])
+
+export const validateRoleChange = withErrors([
+  objectId('orgId', 'organization'),
+  objectId('membershipId', 'membership'),
+  role(),
+])
+
+export const validateToken = withErrors([
+  param('token').isString().isLength({ min: 20, max: 100 }).withMessage('This invitation link is not valid'),
+])
+
+// a password is only needed when the invitee has no account and isn't signed in
+export const validateAccept = withErrors([
+  param('token').isString().isLength({ min: 20, max: 100 }).withMessage('This invitation link is not valid'),
+  newPassword(body('password').if((value, { req }) => !req.user)),
+  body('name')
+    .optional()
+    .isString()
+    .withMessage('Name must be text')
+    .bail()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be 2-50 characters'),
 ])
