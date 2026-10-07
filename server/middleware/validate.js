@@ -140,11 +140,15 @@ export const validateIdParam = withErrors([
 
 const NUL = String.fromCharCode(0)
 
+// isIn() accepts ?status=a&status=b because it checks every element of the array, so a single
+// value is required first
 export const validateJobsQuery = withErrors([
-  query('status').optional().isIn(['all', ...JOB_STATUS]).withMessage('Invalid status filter'),
-  query('jobType').optional().isIn(['all', ...JOB_TYPE]).withMessage('Invalid job type filter'),
+  query('status').optional().isString().bail().isIn(['all', ...JOB_STATUS]).withMessage('Invalid status filter'),
+  query('jobType').optional().isString().bail().isIn(['all', ...JOB_TYPE]).withMessage('Invalid job type filter'),
   query('sort')
     .optional()
+    .isString()
+    .bail()
     .isIn(['latest', 'oldest', 'a-z', 'z-a'])
     .withMessage('Invalid sort option'),
   query('search')
