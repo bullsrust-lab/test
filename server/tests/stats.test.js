@@ -144,9 +144,16 @@ describe('seeded team dataset', () => {
     expect(await Job.countDocuments()).toBe(500)
     expect(await User.countDocuments()).toBe(3)
 
-    await register()
+    const real = await register()
     await expect(seedTeam({ password: 'northwind-seed-2026', log: () => {} })).rejects.toThrow(/didn't create/)
+
+    // a real team with the very same name must survive --force
+    const realTeam = await createTeam(real.token, 'Northwind Talent')
+    await request(app).post('/api/v1/jobs').set(bearer(real.token, realTeam._id)).send(newJob)
+
     await seedTeam({ password: 'northwind-seed-2026', force: true, log: () => {} })
     expect(await User.countDocuments()).toBe(4)
+    expect(await Job.countDocuments({ organization: realTeam._id })).toBe(1)
+    expect(await Job.countDocuments()).toBe(501)
   })
 })

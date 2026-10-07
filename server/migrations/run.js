@@ -19,33 +19,35 @@ const labels = {
   jobsWithoutAuthor: 'jobs whose author no longer exists (left as is)',
 }
 
-const print = (name, summary) => {
-  console.log(`\n${name}`)
-  for (const [key, value] of Object.entries(summary)) {
-    console.log(`  ${(labels[key] ?? key).padEnd(48)} ${value}`)
-  }
-}
-
-const run = async () => {
-  if (!process.env.MONGO_URI) throw new Error('MONGO_URI is not set')
-  await connectDB(process.env.MONGO_URI)
-
+// runs on the current mongoose connection; returns { [name]: summary }
+export async function runMigrations({ log = console.log } = {}) {
   // the unique indexes are what make the upserts safe, so they must exist before anything runs
   await Promise.all([Organization.createIndexes(), Membership.createIndexes(), Job.createIndexes()])
 
+  const results = {}
   for (const migration of migrations) {
     const started = Date.now()
     const summary = await migration.up()
-    print(migration.name, summary)
-    console.log(`  ${'took'.padEnd(48)} ${Date.now() - started} ms`)
+    results[migration.name] = summary
+
+    log(`\n${migration.name}`)
+    for (const [key, value] of Object.entries(summary)) {
+      log(`  ${(labels[key] ?? key).padEnd(48)} ${value}`)
+    }
+    log(`  ${'took'.padEnd(48)} ${Date.now() - started} ms`)
   }
+  return results
 }
 
-try {
-  await run()
-} catch (error) {
-  console.error('Migration failed:', error.message)
-  process.exitCode = 1
-} finally {
-  await mongoose.disconnect()
+if (process.argv[1]?.endsWith('run.js')) {
+  try {
+    if (!process.env.MONGO_URI) throw new Error('MONGO_URI is not set')
+    await connectDB(process.env.MONGO_URI)
+    await runMigrations()
+  } catch (error) {
+    console.error('Migration failed:', error.message)
+    process.exitCode = 1
+  } finally {
+    await mongoose.disconnect()
+  }
 }

@@ -1,5 +1,7 @@
 import Organization from '../models/Organization.js'
 import Membership from '../models/Membership.js'
+import Job from '../models/Job.js'
+import User from '../models/User.js'
 
 export const PERSONAL_ORG_NAME = 'Personal'
 
@@ -60,9 +62,24 @@ export async function ensurePersonalOrg(userId, { session } = {}) {
   return { organization, created }
 }
 
+// Jobs that have no organization yet go to their author's Personal workspace. That's what the
+// migration does; this is the same step for one user, for jobs v1 wrote while v2 was deploying.
+// The filter hits the createdBy index and matches nothing in the normal case.
+export async function adoptOrphanJobs(userId, organizationId) {
+  const orphans = { createdBy: userId, organization: { $exists: false } }
+  if (!(await Job.exists(orphans))) return 0
+  const user = await User.findById(userId).select('name').lean()
+  const { modifiedCount } = await Job.updateMany(orphans, {
+    $set: { organization: organizationId, createdByName: user?.name },
+  })
+  return modifiedCount
+}
+
 // a team workspace, the creator becomes its first owner
 export async function createOrganization(name, ownerId) {
-  const base = slugify(name)
+  let base = slugify(name)
+  // "personal-<userId>" slugs belong to Personal workspaces; a team must never take one
+  if (/^personal(-|$)/.test(base)) base = `team-${base}`.slice(0, 60)
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = await freeSlug(base)

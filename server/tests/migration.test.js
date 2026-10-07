@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { app, bearer, newJob, PASSWORD, personalOrgOf, request, useDatabase } from './helpers.js'
 import { up } from '../migrations/001-orgs.js'
+import { runMigrations } from '../migrations/run.js'
 import Job from '../models/Job.js'
 import Membership from '../models/Membership.js'
 import Organization from '../models/Organization.js'
@@ -100,6 +101,21 @@ describe('001-orgs migration', () => {
     const summary = await up()
     expect(summary.jobsWithoutAuthor).toBe(2)
     expect(await Job.countDocuments({ createdBy: gone._id, organization: { $exists: false } })).toBe(2)
+  })
+
+  it('npm run migrate prints the summary the brief asks for, and nothing to do the second time', async () => {
+    const first = []
+    const second = []
+    await runMigrations({ log: (line) => first.push(line) })
+    await runMigrations({ log: (line) => second.push(line) })
+
+    const text = first.join('\n')
+    for (const label of ['users processed', 'orgs created', 'jobs migrated', 'users already migrated (skipped)']) {
+      expect(text).toContain(label)
+    }
+    expect(text).toMatch(/users processed\s+2/)
+    expect(second.join('\n')).toMatch(/users processed\s+0/)
+    expect(second.join('\n')).toMatch(/users already migrated \(skipped\)\s+3/)
   })
 
   it('leaves legacy users able to use the app exactly like in v1', async () => {

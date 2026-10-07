@@ -13,7 +13,6 @@ export default defineConfig({
       provider: 'v8',
       // the brief measures "new server code" in these three folders
       include: ['controllers/**', 'models/**', 'migrations/**'],
-      exclude: ['migrations/run.js'],
       reporter: ['text', 'text-summary'],
       thresholds: { lines: 65, statements: 65, functions: 65, branches: 65 },
     },

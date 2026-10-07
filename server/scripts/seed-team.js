@@ -19,6 +19,7 @@ import { createOrganization, ensurePersonalOrg } from '../utils/orgs.js'
 
 export const SEED_DOMAIN = 'seed.jobtrail.dev'
 export const SEED_ORG_NAME = 'Northwind Talent'
+const SEED_EMAILS = new RegExp(`@${SEED_DOMAIN.replace(/\./g, '\\.')}$`)
 const JOBS = 500
 
 // owner + two recruiters; a viewer can't add jobs, so the 500 jobs are spread over the three writers
@@ -91,12 +92,17 @@ const buildJob = (organizationId, author, now) => {
   return job
 }
 
+// The seed's orgs are found through the seed users, never by name: an org counts as the seed's
+// only if every member is a seed user. A real team that happens to be called "Northwind Talent",
+// or a team where a real user was invited, is left alone.
 const removePreviousSeed = async () => {
-  const users = await User.find({ email: new RegExp(`@${SEED_DOMAIN.replace(/\./g, '\\.')}$`) }).select('_id')
+  const users = await User.find({ email: SEED_EMAILS }).select('_id')
   const userIds = users.map((u) => u._id)
-  const orgIds = (
-    await Organization.find({ $or: [{ name: SEED_ORG_NAME, slug: /^northwind-talent(-\d+)?$/ }, { personalOf: { $in: userIds } }] }).select('_id')
-  ).map((o) => o._id)
+  const candidates = await Membership.distinct('organization', { user: { $in: userIds } })
+  const orgIds = []
+  for (const id of candidates) {
+    if (!(await Membership.exists({ organization: id, user: { $nin: userIds } }))) orgIds.push(id)
+  }
 
   await Promise.all([
     Job.deleteMany({ organization: { $in: orgIds } }),
@@ -109,7 +115,7 @@ const removePreviousSeed = async () => {
 }
 
 export async function seedTeam({ force = false, password, log = console.log } = {}) {
-  const foreignUsers = await User.countDocuments({ email: { $not: new RegExp(`@${SEED_DOMAIN.replace(/\./g, '\\.')}$`) } })
+  const foreignUsers = await User.countDocuments({ email: { $not: SEED_EMAILS } })
   if (foreignUsers > 0 && !force) {
     throw new Error(
       `The target database already has ${foreignUsers} user(s) the seed didn't create. ` +

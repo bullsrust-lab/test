@@ -10,7 +10,7 @@ import { performance } from 'node:perf_hooks'
 import mongoose from 'mongoose'
 import connectDB from '../config/db.js'
 import User from '../models/User.js'
-import Organization from '../models/Organization.js'
+import Membership from '../models/Membership.js'
 import Job from '../models/Job.js'
 import { statsPipeline } from '../controllers/statsController.js'
 import { SEED_MEMBERS, SEED_ORG_NAME } from './seed-team.js'
@@ -28,8 +28,12 @@ const run = async () => {
   process.env.JWT_SECRET ||= crypto.randomBytes(32).toString('hex')
 
   await connectDB(process.env.SEED_URL)
+  // the team the seeded owner owns, not "any org with that name"
   const owner = await User.findOne({ email: SEED_MEMBERS[0].email })
-  const organization = await Organization.findOne({ name: SEED_ORG_NAME, personalOf: { $exists: false } })
+  const memberships = owner
+    ? await Membership.find({ user: owner._id, role: 'owner' }).populate('organization').lean()
+    : []
+  const organization = memberships.map((m) => m.organization).find((o) => o && !o.personalOf && o.name === SEED_ORG_NAME)
   if (!owner || !organization) throw new Error('No seeded team found, run npm run seed:team first')
   const jobCount = await Job.countDocuments({ organization: organization._id })
 
