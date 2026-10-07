@@ -1,32 +1,61 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import api from '../api/client'
+import api, { setActiveOrgId } from '../api/client'
 import { useAuth } from './AuthContext'
 import { getItem, removeItem, setItem } from '../utils/storage'
 
 const OrgContext = createContext(null)
 
-// The organizations the user belongs to and the one they're working in. The active id lives in
-// localStorage, the axios instance sends it as X-Org-Id with every request.
+// Each tab remembers its own workspace (sessionStorage); localStorage only holds the last choice,
+// so a new tab opens where you were working.
+const storedOrgId = () => {
+  try {
+    const own = sessionStorage.getItem('orgId')
+    if (own) return own
+  } catch {
+    /* storage blocked */
+  }
+  return getItem('orgId')
+}
+
+const rememberOrgId = (id) => {
+  try {
+    if (id) sessionStorage.setItem('orgId', id)
+    else sessionStorage.removeItem('orgId')
+  } catch {
+    /* storage blocked */
+  }
+  if (id) setItem('orgId', id)
+  else removeItem('orgId')
+}
+
+// The organizations the user belongs to and the one this tab is working in.
 export function OrgProvider({ children }) {
   const { token, isDemo } = useAuth()
   const [orgs, setOrgs] = useState([])
-  const [activeId, setActiveId] = useState(() => getItem('orgId'))
+  const [activeId, setActiveId] = useState(storedOrgId)
   const [loading, setLoading] = useState(Boolean(token))
+  const [error, setError] = useState('')
   const [version, setVersion] = useState(0)
+  const [seenToken, setSeenToken] = useState(token)
+
+  // a different session (log out, log in as someone else): start from the stored choice again
+  if (token !== seenToken) {
+    setSeenToken(token)
+    setActiveId(storedOrgId())
+    setOrgs([])
+    setLoading(Boolean(token))
+  }
 
   useEffect(() => {
-    if (!token) {
-      setOrgs([])
-      setLoading(false)
-      return
-    }
+    if (!token) return
     const controller = new AbortController()
     setLoading(true)
+    setError('')
     api
       .get('/orgs', { signal: controller.signal })
       .then(({ data }) => setOrgs(data.organizations))
-      .catch(() => {
-        if (!controller.signal.aborted) setOrgs([])
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(err.response?.data?.msg || "Couldn't load your workspaces")
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
@@ -35,12 +64,26 @@ export function OrgProvider({ children }) {
   }, [token, version])
 
   const personal = orgs.find((o) => o.personal)
-  // a stored id the user is no longer part of falls back to Personal
-  const active = orgs.find((o) => o._id === activeId) ?? personal ?? null
+  const chosen = orgs.find((o) => o._id === activeId)
+  // while the list is (re)loading, an id we don't know yet is "pending", not "fall back to Personal"
+  const active = chosen ?? (loading && activeId ? null : (personal ?? null))
+
+  // set during render, not in an effect: child effects (the pages' first requests) run before
+  // a parent's effects, and they must already go to the right organization
+  setActiveOrgId(active && !active.personal ? active._id : null)
+
+  // pin this tab to what it shows, so a reload stays here even if another tab switches meanwhile
+  useEffect(() => {
+    if (!active) return
+    try {
+      if (!sessionStorage.getItem('orgId')) sessionStorage.setItem('orgId', active._id)
+    } catch {
+      /* storage blocked */
+    }
+  }, [active])
 
   const switchOrg = useCallback((id) => {
-    if (id) setItem('orgId', id)
-    else removeItem('orgId')
+    rememberOrgId(id)
     setActiveId(id)
   }, [])
 
@@ -51,6 +94,7 @@ export function OrgProvider({ children }) {
       orgs,
       active,
       loading,
+      error,
       role: active?.role,
       // the demo account is read-only whatever its role says
       canWrite: !isDemo && (active?.role === 'owner' || active?.role === 'recruiter'),
@@ -58,7 +102,7 @@ export function OrgProvider({ children }) {
       switchOrg,
       reloadOrgs,
     }),
-    [orgs, active, loading, isDemo, switchOrg, reloadOrgs]
+    [orgs, active, loading, error, isDemo, switchOrg, reloadOrgs]
   )
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>

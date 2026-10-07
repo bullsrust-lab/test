@@ -62,8 +62,18 @@ export const saveAuth = ({ user, token }) => {
   setItem('user', JSON.stringify(user))
 }
 
+// the chosen workspace lives in this tab's sessionStorage and, as the default for new tabs, in localStorage
+export const forgetOrgId = () => {
+  removeItem('orgId')
+  try {
+    sessionStorage.removeItem('orgId')
+  } catch {
+    /* ignore */
+  }
+}
+
 export const clearAuth = () => {
   removeItem('token')
   removeItem('user')
-  removeItem('orgId')
+  forgetOrgId()
 }

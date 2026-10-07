@@ -31,7 +31,7 @@ function DashboardLayout() {
   const { pathname } = useLocation()
   const [lastPath, setLastPath] = useState(pathname)
   const { user, isDemo, logout } = useAuth()
-  const { active, canWrite, loading: orgsLoading } = useOrg()
+  const { active, canWrite, loading: orgsLoading, error: orgsError, reloadOrgs } = useOrg()
   const navigate = useNavigate()
   const menuBtnRef = useRef(null)
   const closeBtnRef = useRef(null)
@@ -166,7 +166,18 @@ function DashboardLayout() {
 
         <main className={styles.content} ref={mainRef} tabIndex={-1}>
           <Suspense fallback={<Spinner />}>
-            {orgsLoading && !active ? <Spinner /> : <Outlet key={active?._id ?? 'none'} />}
+            {orgsError && !active ? (
+              <div className={styles.orgError} role="alert">
+                <span>{orgsError}. Your jobs are safe, the page just couldn't load which workspaces you're in.</span>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={reloadOrgs}>
+                  Try again
+                </button>
+              </div>
+            ) : orgsLoading && !active ? (
+              <Spinner />
+            ) : (
+              <Outlet key={active?._id ?? 'none'} />
+            )}
           </Suspense>
         </main>
       </div>

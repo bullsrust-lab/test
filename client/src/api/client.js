@@ -1,14 +1,21 @@
 import axios from 'axios'
-import { clearAuth, getItem, removeItem, setSessionFlag } from '../utils/storage'
+import { clearAuth, forgetOrgId, getItem, setSessionFlag } from '../utils/storage'
 
 const api = axios.create({ baseURL: '/api/v1' })
+
+// The workspace this tab works in, set by OrgProvider from what the UI shows. It's kept in memory
+// rather than read from localStorage on every request: localStorage is shared by all tabs, and a
+// switch in one tab must not quietly send another tab's writes to a different organization.
+let activeOrgId = null
+export const setActiveOrgId = (id) => {
+  activeOrgId = id
+}
 
 api.interceptors.request.use((config) => {
   const token = getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
-  // the organization the user is working in; without it the server uses their Personal workspace
-  const orgId = getItem('orgId')
-  if (orgId && !config.headers['X-Org-Id']) config.headers['X-Org-Id'] = orgId
+  // without it the server uses the Personal workspace
+  if (activeOrgId && !config.headers['X-Org-Id']) config.headers['X-Org-Id'] = activeOrgId
   return config
 })
 
@@ -19,12 +26,17 @@ api.interceptors.response.use(
     const isAuthRoute = error.config?.url?.startsWith('/auth')
     if (error.response?.status === 401 && !isAuthRoute) {
       clearAuth()
-      setSessionFlag('sessionExpired')
-      window.location.assign('/register')
+      if (window.location.pathname.startsWith('/invite/')) {
+        // stay on the invitation: it can still be accepted after logging in again
+        window.dispatchEvent(new Event('auth:expired'))
+      } else {
+        setSessionFlag('sessionExpired')
+        window.location.assign('/register')
+      }
     }
     // removed from the team in the meantime: fall back to the Personal workspace
     if (error.response?.data?.code === 'NOT_A_MEMBER' && error.config?.headers?.['X-Org-Id']) {
-      removeItem('orgId')
+      forgetOrgId()
       window.location.reload()
     }
     return Promise.reject(error)
