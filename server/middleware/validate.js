@@ -174,7 +174,11 @@ export const validateOrgName = withErrors([
     .bail()
     .trim()
     .isLength({ min: 3, max: 80 })
-    .withMessage('Name must be 3-80 characters'),
+    .withMessage('Name must be 3-80 characters')
+    .bail()
+    // the switcher would show two "Personal" entries
+    .custom((value) => value.toLowerCase() !== 'personal')
+    .withMessage('"Personal" is taken by your own workspace, pick another name'),
 ])
 
 const role = () => body('role').isString().withMessage('Role is required').bail().isIn(ROLES).withMessage(`Role must be one of: ${ROLES.join(', ')}`)
@@ -189,13 +193,15 @@ export const validateRoleChange = withErrors([
   role(),
 ])
 
+export const validateMemberId = withErrors([objectId('orgId', 'organization'), objectId('membershipId', 'membership')])
+
 export const validateToken = withErrors([
   param('token').isString().isLength({ min: 20, max: 100 }).withMessage('This invitation link is not valid'),
 ])
 
-// a password is only needed when the invitee has no account and isn't signed in
+// a password is only needed when the invitee has no account and isn't signed in.
+// Runs after the invitation itself was checked, so a used link answers 410 even without a body
 export const validateAccept = withErrors([
-  param('token').isString().isLength({ min: 20, max: 100 }).withMessage('This invitation link is not valid'),
   newPassword(body('password').if((value, { req }) => !req.user)),
   body('name')
     .optional()

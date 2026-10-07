@@ -83,7 +83,7 @@ describe('creating invitations', () => {
 })
 
 describe('preview', () => {
-  it('shows the org, role and whether the address already has an account', async () => {
+  it('shows the org, role and inviter, but not whether the address has an account', async () => {
     const owner = await register({ name: 'Olivia' })
     const existing = await register({ email: 'existing@test.com' })
     const org = await createTeam(owner.token, 'Northwind Talent')
@@ -95,9 +95,10 @@ describe('preview', () => {
     expect(preview.status).toBe(200)
     expect(preview.body).toMatchObject({
       invitation: { email: 'new@test.com', role: 'viewer', invitedBy: 'Olivia', organization: { name: 'Northwind Talent' } },
-      hasAccount: false,
     })
-    expect((await request(app).get(`/api/v1/invitations/${forExisting.body.token}`)).body.hasAccount).toBe(true)
+    // the inviter holds the link, so the preview must not tell them who is registered
+    const other = await request(app).get(`/api/v1/invitations/${forExisting.body.token}`)
+    expect(Object.keys(other.body)).toEqual(['invitation'])
     expect((await request(app).get(`/api/v1/invitations/${'x'.repeat(43)}`)).status).toBe(404)
   })
 })
@@ -183,6 +184,38 @@ describe('accepting', () => {
     expect(res.body.msg).toMatch(/expired/)
     expect(await User.exists({ email: 'mei@test.com' })).toBeNull()
     expect((await accept('y'.repeat(43), { body: { password: PASSWORD } })).status).toBe(404)
+  })
+
+  it('checks the link before the body: 410 for a used or expired link, 409 for an existing account', async () => {
+    const { body: used } = await invite(owner.token, org._id, 'mei@test.com')
+    await accept(used.token, { body: { password: PASSWORD } })
+    const usedAgain = await accept(used.token)
+    expect(usedAgain.status).toBe(410)
+    expect(usedAgain.body.msg).toMatch(/already been used/)
+
+    const { body: expired } = await invite(owner.token, org._id, 'late@test.com')
+    await Invitation.updateOne({ email: 'late@test.com' }, { $set: { expiresAt: new Date(Date.now() - 1000) } })
+    expect((await accept(expired.token)).status).toBe(410)
+
+    await register({ email: 'ravi@test.com' })
+    const { body: existing } = await invite(owner.token, org._id, 'ravi@test.com')
+    expect((await accept(existing.token)).status).toBe(409)
+  })
+
+  it('stops working once the owner who sent it is no longer an owner', async () => {
+    const coOwner = await register({ email: 'co@test.com' })
+    const { body: coInvite } = await invite(owner.token, org._id, 'co@test.com', 'owner')
+    await accept(coInvite.token, { auth: coOwner.token })
+
+    const { body: pending } = await invite(coOwner.token, org._id, 'alt@test.com', 'owner')
+    const members = (await request(app).get(`/api/v1/orgs/${org._id}`).set(bearer(owner.token))).body.members
+    const coMembership = members.find((m) => m.email === 'co@test.com').membershipId
+    await request(app)
+      .patch(`/api/v1/orgs/${org._id}/memberships/${coMembership}`)
+      .set(bearer(owner.token))
+      .send({ role: 'viewer' })
+
+    expect((await accept(pending.token, { body: { password: PASSWORD } })).status).toBe(410)
   })
 
   it('lets only one of two simultaneous acceptances through', async () => {

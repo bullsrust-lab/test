@@ -35,9 +35,24 @@ const summary = (invitation) => ({
   slug: invitation.organization.slug,
 })
 
-// what the accept page shows before anyone types anything
+export const loadInvitation = async (req, res, next) => {
+  req.invitation = await findUsableInvitation(req.params.token)
+  next()
+}
+
+// anonymous accept for an address that already has an account: log in first (see ADR-003).
+// It sits behind the accept rate limit, so it can't be used to test addresses in bulk
+export const rejectExistingAccount = async (req, res, next) => {
+  if (!req.user && (await User.exists({ email: req.invitation.email }))) {
+    throw new ConflictError('An account with this email already exists. Log in to accept the invitation.')
+  }
+  next()
+}
+
+// what the accept page shows before anyone types anything. It deliberately doesn't say whether the
+// address has an account: without a mailer the link goes back to whoever created the invitation
 export const previewInvitation = async (req, res) => {
-  const invitation = await findUsableInvitation(req.params.token)
+  const { invitation } = req
 
   res.status(StatusCodes.OK).json({
     invitation: {
@@ -47,13 +62,11 @@ export const previewInvitation = async (req, res) => {
       organization: summary(invitation),
       invitedBy: invitation.invitedBy?.name,
     },
-    // only someone holding the link learns this, and the link was sent to that address
-    hasAccount: Boolean(await User.exists({ email: invitation.email })),
   })
 }
 
 export const acceptInvitation = async (req, res) => {
-  const invitation = await findUsableInvitation(req.params.token)
+  const { invitation } = req
 
   // flow 1: signed in. The account has to be the one the invitation was sent to
   if (req.user) {
@@ -77,12 +90,8 @@ export const acceptInvitation = async (req, res) => {
     return res.status(StatusCodes.OK).json({ organization: summary(invitation), role: membership.role })
   }
 
-  // flow 2: anonymous. Only for addresses without an account, see ADR-003 for why we don't
-  // treat the password as a login here
-  if (await User.exists({ email: invitation.email })) {
-    throw new ConflictError('An account with this email already exists. Log in to accept the invitation.')
-  }
-
+  // flow 2: anonymous, no account (rejectExistingAccount already answered 409 otherwise).
+  // ADR-003 explains why the password isn't treated as a login here
   const { password } = req.body
   // the brief only asks for a password; a name is optional and defaults to the email's first part
   const localPart = invitation.email.split('@')[0].slice(0, 50)
