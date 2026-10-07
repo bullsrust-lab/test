@@ -145,6 +145,8 @@ function Team() {
   const [lastInvite, setLastInvite] = useState(null)
   const [newTeamOpen, setNewTeamOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  // a change that needs a second look: demoting an owner (yourself included) or removing someone
+  const [confirm, setConfirm] = useState(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -185,7 +187,12 @@ function Team() {
     }
   }
 
-  const changeRole = async (member, role) => {
+  const changeRole = (member, role) => {
+    if (member.role === 'owner' && role !== 'owner') setConfirm({ type: 'demote', member, role })
+    else applyRole(member, role)
+  }
+
+  const applyRole = async (member, role) => {
     try {
       await api.patch(`/orgs/${active._id}/memberships/${member.membershipId}`, { role })
       toast.success(`${member.name} is now ${role === 'owner' ? 'an owner' : `a ${role}`}`)
@@ -196,6 +203,23 @@ function Team() {
       toast.error(getErrorMessage(err))
       reload()
     }
+  }
+
+  const removeMember = async (member) => {
+    try {
+      await api.delete(`/orgs/${active._id}/memberships/${member.membershipId}`)
+      toast.success(`${member.name} was removed from the team`)
+      reload()
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    }
+  }
+
+  const confirmChange = async () => {
+    const { type, member, role } = confirm
+    setConfirm(null)
+    if (type === 'demote') await applyRole(member, role)
+    else await removeMember(member)
   }
 
   const leave = async () => {
@@ -264,7 +288,9 @@ function Team() {
   if (!team) return <Spinner />
 
   const owners = team.members.filter((m) => m.role === 'owner').length
-  const canLeave = team.role !== 'owner' || owners > 1
+  // alone in the team: leaving deletes it, nobody else depends on it
+  const alone = team.members.length === 1
+  const canLeave = team.role !== 'owner' || owners > 1 || alone
 
   return (
     <>
@@ -330,6 +356,16 @@ function Team() {
               ) : (
                 <span className={`${styles.role} ${styles[member.role]}`}>{member.role}</span>
               )}
+              {isOwner && !isDemo && member.userId !== user?._id && (
+                <button
+                  type="button"
+                  className={`btn btn-sm ${styles.removeBtn}`}
+                  onClick={() => setConfirm({ type: 'remove', member })}
+                  aria-label={`Remove ${member.name} from the team`}
+                >
+                  Remove
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -359,21 +395,59 @@ function Team() {
       <div className={styles.leave}>
         {canLeave ? (
           <button type="button" className={`btn btn-sm ${styles.leaveBtn}`} onClick={() => setLeaveOpen(true)} disabled={isDemo}>
-            Leave {team.organization.name}
+            {alone ? `Delete ${team.organization.name}` : `Leave ${team.organization.name}`}
           </button>
         ) : (
           <p className={styles.muted}>You're the only owner. Make someone else an owner before you can leave.</p>
         )}
       </div>
 
-      <Modal open={leaveOpen} title={`Leave ${team.organization.name}?`} onClose={() => !busy && setLeaveOpen(false)}>
-        <p className={styles.modalText}>You'll lose access to its jobs. An owner can invite you back.</p>
+      <Modal
+        open={leaveOpen}
+        title={alone ? `Delete ${team.organization.name}?` : `Leave ${team.organization.name}?`}
+        onClose={() => !busy && setLeaveOpen(false)}
+      >
+        <p className={styles.modalText}>
+          {alone
+            ? "You're the only member, so the team and all of its jobs will be deleted. This can't be undone."
+            : "You'll lose access to its jobs. An owner can invite you back."}
+        </p>
         <div className={styles.modalActions}>
           <button type="button" className="btn btn-ghost" onClick={() => setLeaveOpen(false)} disabled={busy}>
-            Stay
+            Cancel
           </button>
           <button type="button" className="btn btn-danger" onClick={leave} disabled={busy}>
-            {busy ? 'Leaving…' : 'Leave team'}
+            {busy ? 'Please wait…' : alone ? 'Delete team' : 'Leave team'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(confirm)}
+        title={
+          confirm?.type === 'remove'
+            ? `Remove ${confirm.member.name}?`
+            : confirm?.member.userId === user?._id
+              ? 'Step down as owner?'
+              : `Make ${confirm?.member.name} a ${confirm?.role}?`
+        }
+        onClose={() => setConfirm(null)}
+      >
+        {confirm && (
+          <p className={styles.modalText}>
+            {confirm.type === 'remove'
+              ? `They lose access to ${team.organization.name} right away. Invitations they sent as an owner stop working.`
+              : confirm.member.userId === user?._id
+                ? `You won't be able to invite people or change roles in ${team.organization.name} any more.`
+                : `They won't be able to invite people or change roles any more, and links they sent stop working.`}
+          </p>
+        )}
+        <div className={styles.modalActions}>
+          <button type="button" className="btn btn-ghost" onClick={() => setConfirm(null)}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-danger" onClick={confirmChange}>
+            {confirm?.type === 'remove' ? 'Remove' : 'Change role'}
           </button>
         </div>
       </Modal>

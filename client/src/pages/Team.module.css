@@ -195,3 +195,12 @@
     flex-wrap: wrap;
   }
 }
+
+.removeBtn {
+  background: transparent;
+  color: var(--danger);
+}
+
+.removeBtn:hover {
+  background: var(--danger-soft);
+}
